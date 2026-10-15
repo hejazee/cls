@@ -1,0 +1,1085 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048</title>
+
+    <!-- jQuery handles DOM selection, events, and element creation. -->
+    <script src="jquery-3.7.1.min.js"></script>
+
+    <style>
+        /* =========================================================
+           1. PAGE LAYOUT
+           ========================================================= */
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 24px 12px;
+            background: #faf8ef;
+            color: #776e65;
+            font-family: Arial, sans-serif;
+        }
+
+        .game {
+            width: min(460px, 100%);
+            margin: auto;
+        }
+
+        .header,
+        .toolbar,
+        .scores {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .header {
+            margin-bottom: 18px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 56px;
+        }
+
+        .scores {
+            gap: 6px;
+        }
+
+        .score-box {
+            min-width: 76px;
+            padding: 8px 10px;
+            border-radius: 4px;
+            background: #bbada0;
+            color: white;
+            text-align: center;
+        }
+
+        .score-label {
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .score-value {
+            margin-top: 4px;
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        /* =========================================================
+           2. BUTTONS
+           ========================================================= */
+
+        .toolbar {
+            margin-bottom: 14px;
+        }
+
+        .buttons {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        button {
+            padding: 10px 13px;
+            border: 0;
+            border-radius: 4px;
+            background: #8f7a66;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover:not(:disabled) {
+            background: #776452;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* Undo is intentionally smaller and less prominent. */
+        #undo {
+            padding: 7px 9px;
+            background: transparent;
+            color: #776e65;
+            border: 1px solid #bbada0;
+            font-size: 12px;
+        }
+
+        #undo:hover:not(:disabled) {
+            background: #eee4da;
+        }
+
+        /* =========================================================
+           3. BOARD AND EMPTY CELLS
+           ========================================================= */
+
+        /*
+         * The board has two layers:
+         *
+         * .cells      - the 16 stationary background cells
+         * .tile-layer - the actual movable tile elements
+         *
+         * Keeping these layers separate lets each tile move smoothly
+         * with CSS transitions instead of rebuilding the whole grid.
+         */
+
+        .board {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1;
+            padding: 10px;
+            overflow: hidden;
+            background: #bbada0;
+            border-radius: 6px;
+            touch-action: none;
+        }
+
+        .cells {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 10px;
+            width: 100%;
+            height: 100%;
+        }
+
+        .cell {
+            background: rgba(238, 228, 218, 0.35);
+            border-radius: 4px;
+        }
+
+        /*
+         * The tile layer occupies the padded interior of the board.
+         * JavaScript calculates tile positions in pixels, allowing
+         * the same CSS transition to work for every movement direction.
+         */
+        .tile-layer {
+            position: absolute;
+            inset: 10px;
+            pointer-events: none;
+        }
+
+        /* =========================================================
+           4. MOVABLE TILES
+           ========================================================= */
+
+        .tile {
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 4px;
+            background: #eee4da;
+            color: #776e65;
+            font-size: clamp(20px, 7vw, 34px);
+            font-weight: bold;
+
+            /*
+             * Changing left and top animates tile movement.
+             * Changing transform animates a tile appearing or merging.
+             */
+            transition:
+                left 120ms ease-in-out,
+                top 120ms ease-in-out;
+        }
+
+        /* A newly generated tile grows into view. */
+        .tile.spawn {
+            animation: spawn 140ms ease-out;
+        }
+
+        /* The surviving tile briefly grows when a merge occurs. */
+        .tile.merge {
+            animation: merge 180ms ease-in-out;
+            z-index: 2;
+        }
+
+        @keyframes spawn {
+            from {
+                transform: scale(0.3);
+                opacity: 0.5;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes merge {
+            0%   { transform: scale(1); }
+            50%  { transform: scale(1.18); }
+            100% { transform: scale(1); }
+        }
+
+        /* =========================================================
+           5. TILE COLORS
+           ========================================================= */
+
+        .tile[data-value="2"] {
+            background: #eee4da;
+        }
+
+        .tile[data-value="4"] {
+            background: #ede0c8;
+        }
+
+        .tile[data-value="8"] {
+            background: #f2b179;
+            color: white;
+        }
+
+        .tile[data-value="16"] {
+            background: #f59563;
+            color: white;
+        }
+
+        .tile[data-value="32"] {
+            background: #f67c5f;
+            color: white;
+        }
+
+        .tile[data-value="64"] {
+            background: #f65e3b;
+            color: white;
+        }
+
+        .tile[data-value="128"] {
+            background: #edcf72;
+            color: white;
+            font-size: clamp(18px, 6vw, 28px);
+        }
+
+        .tile[data-value="256"] {
+            background: #edcc61;
+            color: white;
+            font-size: clamp(18px, 6vw, 28px);
+        }
+
+        .tile[data-value="512"] {
+            background: #edc850;
+            color: white;
+            font-size: clamp(18px, 6vw, 28px);
+        }
+
+        .tile[data-value="1024"] {
+            background: #edc53f;
+            color: white;
+            font-size: clamp(15px, 5vw, 24px);
+        }
+
+        .tile[data-value="2048"] {
+            background: #edc22e;
+            color: white;
+            font-size: clamp(15px, 5vw, 24px);
+        }
+
+        /* =========================================================
+           6. MESSAGES
+           ========================================================= */
+
+        .message {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 14px;
+            background: rgba(238, 228, 218, 0.85);
+            text-align: center;
+            z-index: 5;
+        }
+
+        .message[hidden] {
+            display: none;
+        }
+
+        .message h2 {
+            margin: 0;
+            font-size: 34px;
+        }
+
+        .help {
+            margin-top: 16px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .tile {
+                transition: none;
+            }
+
+            .tile.spawn,
+            .tile.merge {
+                animation: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="game">
+
+        <!-- ---------- HEADER AND SCORES ---------- -->
+
+        <header class="header">
+            <h1>2048</h1>
+
+            <div class="scores">
+                <div class="score-box">
+                    <div class="score-label">Score</div>
+                    <div class="score-value" id="score">0</div>
+                </div>
+
+                <div class="score-box">
+                    <div class="score-label">Best</div>
+                    <div class="score-value" id="best">0</div>
+                </div>
+            </div>
+        </header>
+
+        <!-- ---------- GAME CONTROLS ---------- -->
+
+        <div class="toolbar">
+            <div>Join the tiles to reach <strong>2048!</strong></div>
+
+            <div class="buttons">
+                <!-- Undo is disabled when there is no saved move. -->
+                <button id="undo" disabled title="Undo (Ctrl+Z)">↶ Undo</button>
+                <button id="restart">New Game</button>
+            </div>
+        </div>
+
+        <!-- ---------- GAME BOARD ---------- -->
+
+        <div class="board" id="board">
+
+            <!-- These 16 cells are only the stationary board background. -->
+            <div class="cells" aria-hidden="true">
+                <div class="cell"></div>
+                <div class="cell"></div>
+                <div class="cell"></div>
+                <div class="cell"></div>
+
+                <div class="cell"></div>
+                <div class="cell"></div>
+                <div class="cell"></div>
+                <div class="cell"></div>
+
+                <div class="cell"></div>
+                <div class="cell"></div>
+                <div class="cell"></div>
+                <div class="cell"></div>
+
+                <div class="cell"></div>
+                <div class="cell"></div>
+                <div class="cell"></div>
+                <div class="cell"></div>
+            </div>
+
+            <!-- JavaScript inserts the movable tiles into this layer. -->
+            <div class="tile-layer" id="tile-layer"></div>
+
+            <!-- This overlay is shown when the player wins or loses. -->
+            <div class="message" id="message" hidden>
+                <h2 id="message-title">Game over!</h2>
+                <button id="message-button">Try Again</button>
+            </div>
+        </div>
+
+        <p class="help">
+            Use the <strong>arrow keys</strong> to move the tiles.
+            Press <strong>Ctrl+Z</strong> (or <strong>Cmd+Z</strong> on Mac)
+            to undo a move.
+        </p>
+    </main>
+
+    <script>
+        /*
+         * ============================================================
+         * 2048 GAME
+         * ============================================================
+         *
+         * The code is organized into one class, with methods grouped
+         * by responsibility:
+         *
+         * 1. Constructor and state
+         * 2. New game and random tiles
+         * 3. Rendering and animation
+         * 4. Movement and merging
+         * 5. Undo history
+         * 6. Win and game-over detection
+         * 7. User input
+         *
+         * The JavaScript board is the source of truth.
+         * HTML is only the visual representation of that board.
+         *
+         * Each tile is an object:
+         *
+         * {
+         *     id: 1,       // Unique identity, used to preserve its DOM element
+         *     value: 2,    // Number displayed on the tile
+         *     row: 0,      // Current row, from 0 to 3
+         *     col: 1       // Current column, from 0 to 3
+         * }
+         *
+         * An empty cell is represented by null.
+         */
+
+
+        class Game2048 {
+
+            // ========================================================
+            // 1. CONSTRUCTOR AND INITIAL STATE
+            // ========================================================
+
+            constructor() {
+                this.size = 4;
+
+                // The board is a 4 × 4 array of tile objects or null.
+                this.board = [];
+
+                this.score = 0;
+                this.best = Number(localStorage.getItem('2048-best')) || 0;
+
+                // These flags describe the current game state.
+                this.gameOver = false;
+                this.won = false;
+
+                // Assign a unique ID to every tile created during this session.
+                this.nextId = 1;
+
+                /*
+                 * Each saved state represents the game immediately before
+                 * one successful move. The history is limited to 10 moves.
+                 */
+                this.history = [];
+                this.historyLimit = 10;
+
+                // Cache DOM references instead of querying them repeatedly.
+                this.$board = $('#board');
+                this.$layer = $('#tile-layer');
+                this.$score = $('#score');
+                this.$best = $('#best');
+                this.$undo = $('#undo');
+                this.$message = $('#message');
+                this.$messageTitle = $('#message-title');
+                this.$messageButton = $('#message-button');
+
+                /*
+                 * Keep references to the DOM elements representing tiles.
+                 * The Map key is a tile's unique ID.
+                 *
+                 * Reusing these elements is essential: changing their
+                 * left/top positions triggers CSS movement transitions.
+                 */
+                this.tileElements = new Map();
+
+                // Start a new game, then connect keyboard and button events.
+                this.newGame();
+                this.bindEvents();
+            }
+
+
+            // ========================================================
+            // 2. NEW GAME AND RANDOM TILES
+            // ========================================================
+
+            newGame() {
+                // Remove the old visual tiles and their DOM references.
+                this.$layer.empty();
+                this.tileElements.clear();
+
+                // Create a fresh board filled with empty cells.
+                this.board = Array.from(
+                    { length: this.size },
+                    () => Array(this.size).fill(null)
+                );
+
+                this.score = 0;
+                this.gameOver = false;
+                this.won = false;
+
+                // A new game has no moves available to undo.
+                this.history = [];
+                this.updateUndoButton();
+
+                // Hide any win or game-over overlay from the previous game.
+                this.$message.prop('hidden', true);
+
+                // Standard 2048 games begin with two tiles.
+                this.addRandomTile();
+                this.addRandomTile();
+
+                this.render();
+            }
+
+            addRandomTile() {
+                /*
+                 * Collect every empty cell first.
+                 * This avoids repeatedly guessing random positions when
+                 * the board is almost full.
+                 */
+                const emptyCells = [];
+
+                for (let row = 0; row < this.size; row++) {
+                    for (let col = 0; col < this.size; col++) {
+                        if (this.board[row][col] === null) {
+                            emptyCells.push({ row, col });
+                        }
+                    }
+                }
+
+                // A full board cannot accept another tile.
+                if (emptyCells.length === 0) {
+                    return;
+                }
+
+                // Select one of the empty cells uniformly at random.
+                const index = Math.floor(Math.random() * emptyCells.length);
+                const { row, col } = emptyCells[index];
+
+                // A new tile is 2 in 90% of cases and 4 in 10% of cases.
+                this.board[row][col] = {
+                    id: this.nextId++,
+                    value: Math.random() < 0.9 ? 2 : 4,
+                    row,
+                    col
+                };
+            }
+
+
+            // ========================================================
+            // 3. RENDERING AND ANIMATION
+            // ========================================================
+
+            render(mergedIds = [], newIds = []) {
+                /*
+                 * This method synchronizes the DOM with the game state.
+                 *
+                 * It deliberately does not rebuild the entire tile layer.
+                 * Existing tile elements are reused so CSS can animate
+                 * changes in their positions.
+                 *
+                 * mergedIds contains surviving tile IDs that just merged.
+                 * newIds contains newly generated tile IDs.
+                 */
+
+                const activeIds = new Set();
+
+                // Calculate the geometry of the tile layer in pixels.
+                const layerWidth = this.$layer.innerWidth();
+                const gap = 10;
+                const cellSize = (layerWidth - gap * (this.size - 1))
+                               / this.size;
+
+                for (let row = 0; row < this.size; row++) {
+                    for (let col = 0; col < this.size; col++) {
+                        const tile = this.board[row][col];
+
+                        // Empty cells have no movable DOM element.
+                        if (tile === null) {
+                            continue;
+                        }
+
+                        activeIds.add(tile.id);
+
+                        let $tile = this.tileElements.get(tile.id);
+
+                        if (!$tile) {
+                            /*
+                             * Create an element only when this tile has
+                             * never been rendered before, such as a new tile.
+                             */
+                            $tile = $('<div class="tile"></div>');
+                            this.tileElements.set(tile.id, $tile);
+                            this.$layer.append($tile);
+                        }
+
+                        // Update the displayed value and its color selector.
+                        $tile.text(tile.value);
+                        $tile.attr('data-value', tile.value);
+
+                        // Calculate the tile's top-left pixel coordinates.
+                        const left = col * (cellSize + gap);
+                        const top = row * (cellSize + gap);
+
+                        /*
+                         * Position changes are animated by CSS transitions.
+                         * The element keeps its identity while it moves.
+                         */
+                        $tile.css({
+                            width: cellSize + 'px',
+                            height: cellSize + 'px',
+                            left: left + 'px',
+                            top: top + 'px'
+                        });
+
+                        // Animate a tile that has just been created.
+                        if (newIds.includes(tile.id)) {
+                            $tile.addClass('spawn');
+
+                            // Remove the class so future moves can reuse it.
+                            setTimeout(() => $tile.removeClass('spawn'), 160);
+                        }
+
+                        // Animate the surviving tile after a merge.
+                        if (mergedIds.includes(tile.id)) {
+                            $tile.removeClass('merge');
+
+                            /*
+                             * Force the browser to register the class removal
+                             * before adding it again. This restarts the animation
+                             * if the same tile merges on a later move.
+                             */
+                            void $tile[0].offsetWidth;
+                            $tile.addClass('merge');
+
+                            setTimeout(() => $tile.removeClass('merge'), 200);
+                        }
+                    }
+                }
+
+                /*
+                 * Remove elements whose tiles no longer exist in the board.
+                 * This normally removes the consumed tile after a merge.
+                 */
+                for (const [id, $tile] of this.tileElements) {
+                    if (!activeIds.has(id)) {
+                        $tile.remove();
+                        this.tileElements.delete(id);
+                    }
+                }
+
+                // Refresh the score displays and the undo button.
+                this.$score.text(this.score);
+                this.$best.text(this.best);
+                this.updateUndoButton();
+            }
+
+            updateTilePositions() {
+                /*
+                 * Re-render after the window changes size.
+                 * The board state remains unchanged; only tile geometry
+                 * needs recalculating.
+                 */
+                this.render();
+            }
+
+
+            // ========================================================
+            // 4. MOVEMENT AND MERGING
+            // ========================================================
+
+            move(direction) {
+                // Ignore movement when the game is over or a win is paused.
+                if (this.gameOver || this.won) {
+                    return;
+                }
+
+                /*
+                 * Save the current state temporarily.
+                 * It will enter the undo history only if the move succeeds.
+                 */
+                const previousState = this.createSnapshot();
+
+                // Construct a new board without changing the current board.
+                const nextBoard = Array.from(
+                    { length: this.size },
+                    () => Array(this.size).fill(null)
+                );
+
+                const mergedIds = [];
+                let scoreGained = 0;
+
+                /*
+                 * Process one row or column at a time.
+                 *
+                 * Each line's coordinates are ordered from the destination
+                 * edge toward the opposite edge:
+                 *
+                 * Left:  column 0, 1, 2, 3
+                 * Right: column 3, 2, 1, 0
+                 * Up:    row 0, 1, 2, 3
+                 * Down:  row 3, 2, 1, 0
+                 *
+                 * This means every direction can use the same merge logic.
+                 */
+
+                for (let lineIndex = 0; lineIndex < this.size; lineIndex++) {
+                    const positions = [];
+
+                    for (let step = 0; step < this.size; step++) {
+                        let row;
+                        let col;
+
+                        if (direction === 'left' || direction === 'right') {
+                            row = lineIndex;
+                            col = direction === 'left'
+                                ? step
+                                : this.size - 1 - step;
+                        } else {
+                            col = lineIndex;
+                            row = direction === 'up'
+                                ? step
+                                : this.size - 1 - step;
+                        }
+
+                        positions.push({ row, col });
+                    }
+
+                    // Read the non-empty tiles in movement order.
+                    const tiles = positions
+                        .map(({ row, col }) => this.board[row][col])
+                        .filter(tile => tile !== null);
+
+                    const result = [];
+
+                    /*
+                     * Merge neighboring equal tiles.
+                     *
+                     * When two tiles merge, the first tile survives and
+                     * doubles its value. The second tile is consumed.
+                     *
+                     * Advancing by two after a merge ensures that a tile
+                     * created by merging cannot merge again in this move.
+                     *
+                     * Example:
+                     * [2, 2, 4, 0] -> [4, 4, 0, 0]
+                     * NOT          -> [8, 0, 0, 0]
+                     */
+                    for (let i = 0; i < tiles.length; i++) {
+                        const current = { ...tiles[i] };
+                        const next = tiles[i + 1];
+
+                        if (next && current.value === next.value) {
+                            current.value *= 2;
+
+                            // The surviving tile gets the merged value.
+                            result.push(current);
+                            mergedIds.push(current.id);
+
+                            // Every merge adds the resulting value to score.
+                            scoreGained += current.value;
+
+                            // Skip the consumed tile.
+                            i++;
+                        } else {
+                            result.push(current);
+                        }
+                    }
+
+                    /*
+                     * Place the resulting tiles against the movement edge.
+                     * Remaining cells in the line stay empty.
+                     */
+                    for (let i = 0; i < result.length; i++) {
+                        const tile = result[i];
+                        const { row, col } = positions[i];
+
+                        tile.row = row;
+                        tile.col = col;
+
+                        nextBoard[row][col] = tile;
+                    }
+                }
+
+                // Detect whether any tile changed position or value.
+                const changed = !this.boardsEqual(this.board, nextBoard);
+
+                // An ineffective move must not affect score or history.
+                if (!changed) {
+                    return;
+                }
+
+                // Save the pre-move state, keeping only the latest 10 moves.
+                this.history.push(previousState);
+
+                if (this.history.length > this.historyLimit) {
+                    this.history.shift();
+                }
+
+                // Commit the calculated move.
+                this.board = nextBoard;
+                this.score += scoreGained;
+
+                // A successful move creates exactly one random tile.
+                this.addRandomTile();
+
+                // Update the best score if necessary.
+                this.updateBestScore();
+
+                /*
+                 * Render once after the complete logical move.
+                 * Existing elements slide to their new positions.
+                 */
+                const newIds = [];
+
+                // Find the newly created tile by comparing with the snapshot.
+                const oldIds = new Set(
+                    previousState.board.flat()
+                        .filter(tile => tile !== null)
+                        .map(tile => tile.id)
+                );
+
+                for (const row of this.board) {
+                    for (const tile of row) {
+                        if (tile !== null && !oldIds.has(tile.id)) {
+                            newIds.push(tile.id);
+                        }
+                    }
+                }
+
+                this.render(mergedIds, newIds);
+                this.checkGameState();
+            }
+
+            boardsEqual(first, second) {
+                /*
+                 * Compare only tile values and positions, not object identity.
+                 * Two different arrays can still represent the same board.
+                 */
+                for (let row = 0; row < this.size; row++) {
+                    for (let col = 0; col < this.size; col++) {
+                        const a = first[row][col];
+                        const b = second[row][col];
+
+                        if (a === null && b === null) {
+                            continue;
+                        }
+
+                        if (a === null || b === null) {
+                            return false;
+                        }
+
+                        if (a.value !== b.value) {
+                            return false;
+                        }
+                    }
+                }
+
+                return true;
+            }
+
+
+            // ========================================================
+            // 5. UNDO HISTORY
+            // ========================================================
+
+            createSnapshot() {
+                /*
+                 * Save everything required to restore the previous state.
+                 * Clone tile objects so later movement cannot alter history.
+                 *
+                 * nextId is intentionally not restored: tile IDs should
+                 * remain unique throughout this game session.
+                 */
+                return {
+                    board: this.board.map(row =>
+                        row.map(tile => tile ? { ...tile } : null)
+                    ),
+                    score: this.score,
+                    won: this.won,
+                    gameOver: this.gameOver
+                };
+            }
+
+            undo() {
+                // Nothing to undo if the history is empty.
+                if (this.history.length === 0) {
+                    return;
+                }
+
+                // Restore the most recently saved state.
+                const previousState = this.history.pop();
+
+                this.board = previousState.board;
+                this.score = previousState.score;
+                this.won = previousState.won;
+                this.gameOver = previousState.gameOver;
+
+                // Hide a game-ending message if undo returns to normal play.
+                this.$message.prop('hidden', true);
+
+                /*
+                 * Render the restored board.
+                 * Tiles that still exist will slide back to their old positions.
+                 */
+                this.render();
+
+                // Refresh undo availability after removing one history entry.
+                this.updateUndoButton();
+            }
+
+            updateUndoButton() {
+                // Undo is available only when at least one move is saved.
+                this.$undo.prop('disabled', this.history.length === 0);
+
+                // Make the remaining history count available as a tooltip.
+                this.$undo.attr(
+                    'title',
+                    `Undo (Ctrl+Z) — ${this.history.length} move(s) available`
+                );
+            }
+
+
+            // ========================================================
+            // 6. BEST SCORE AND GAME STATE
+            // ========================================================
+
+            updateBestScore() {
+                if (this.score > this.best) {
+                    this.best = this.score;
+
+                    // Save the record so it survives a page reload.
+                    localStorage.setItem('2048-best', String(this.best));
+                }
+            }
+
+            checkGameState() {
+                /*
+                 * Winning does not mean the player has lost.
+                 * Show a message once when 2048 is first created.
+                 */
+                const has2048 = this.board.some(row =>
+                    row.some(tile => tile !== null && tile.value >= 2048)
+                );
+
+                if (has2048 && !this.won) {
+                    this.won = true;
+                    this.showMessage('You win!', 'Keep Playing');
+                    return;
+                }
+
+                // Any empty cell means at least one move may remain possible.
+                const hasEmptyCell = this.board.some(row =>
+                    row.some(tile => tile === null)
+                );
+
+                if (hasEmptyCell) {
+                    return;
+                }
+
+                /*
+                 * A full board is not necessarily a game over.
+                 * Matching horizontal or vertical neighbors can still merge.
+                 */
+                for (let row = 0; row < this.size; row++) {
+                    for (let col = 0; col < this.size; col++) {
+                        const value = this.board[row][col].value;
+
+                        // Check the tile to the right.
+                        if (
+                            col + 1 < this.size &&
+                            value === this.board[row][col + 1].value
+                        ) {
+                            return;
+                        }
+
+                        // Check the tile below.
+                        if (
+                            row + 1 < this.size &&
+                            value === this.board[row + 1][col].value
+                        ) {
+                            return;
+                        }
+                    }
+                }
+
+                // The board is full and no adjacent tiles can merge.
+                this.gameOver = true;
+                this.showMessage('Game over!', 'Try Again');
+            }
+
+            showMessage(title, buttonText) {
+                this.$messageTitle.text(title);
+                this.$messageButton.text(buttonText);
+                this.$message.prop('hidden', false);
+            }
+
+
+            // ========================================================
+            // 7. USER INPUT
+            // ========================================================
+
+            bindEvents() {
+                /*
+                 * Map keyboard keys to movement directions.
+                 * preventDefault() prevents arrow keys from scrolling the page.
+                 */
+                $(document).on('keydown', event => {
+                    const directions = {
+                        ArrowLeft: 'left',
+                        ArrowRight: 'right',
+                        ArrowUp: 'up',
+                        ArrowDown: 'down'
+                    };
+
+                    // Ctrl+Z on Windows/Linux and Cmd+Z on macOS both undo.
+                    if (
+                        (event.ctrlKey || event.metaKey) &&
+                        event.key.toLowerCase() === 'z'
+                    ) {
+                        event.preventDefault();
+                        this.undo();
+                        return;
+                    }
+
+                    const direction = directions[event.key];
+
+                    if (direction) {
+                        event.preventDefault();
+                        this.move(direction);
+                    }
+                });
+
+                // Connect the visible Undo button.
+                this.$undo.on('click', () => this.undo());
+
+                // Start a completely new game.
+                $('#restart').on('click', () => this.newGame());
+
+                /*
+                 * After winning, Keep Playing hides the overlay and permits
+                 * further moves. After losing, Try Again starts a new game.
+                 */
+                this.$messageButton.on('click', () => {
+                    if (this.won && !this.gameOver) {
+                        this.won = false;
+                        this.$message.prop('hidden', true);
+                    } else {
+                        this.newGame();
+                    }
+                });
+
+                // Recalculate tile geometry when the window is resized.
+                $(window).on('resize', () => this.updateTilePositions());
+            }
+        }
+
+
+        // ============================================================
+        // INITIALIZE THE GAME
+        // ============================================================
+
+        // Wait until the HTML is ready before accessing the game elements.
+        $(function () {
+            new Game2048();
+        });
+    </script>
+</body>
+</html>
