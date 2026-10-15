@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>2048</title>
+
+    <style>
+        /* Center the game on the page. */
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: #faf8ef;
+        }
+
+        /* The board is a 4 × 4 CSS Grid. */
+        #board {
+            display: grid;
+            grid-template: repeat(4, 70px) / repeat(4, 70px);
+            gap: 6px;
+            justify-content: center;
+            background: #bbada0;
+            padding: 6px;
+            width: max-content;
+            margin: 20px auto;
+        }
+
+        /* Every cell has the same size, whether empty or occupied. */
+        .cell {
+            width: 70px;
+            height: 70px;
+            display: grid;
+            place-items: center;
+            background: #cdc1b4;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 4px;
+        }
+
+        /* Give numbered tiles different background colors. */
+        .cell:not(:empty)      { background: #eee4da; }
+        .cell[data-value="4"]  { background: #ede0c8; }
+        .cell[data-value="8"]  { background: #f2b179; }
+        .cell[data-value="16"] { background: #f59563; }
+        .cell[data-value="32"] { background: #f67c5f; }
+        .cell[data-value="64"] { background: #f65e3b; }
+        .cell[data-value="128"],
+        .cell[data-value="256"],
+        .cell[data-value="512"],
+        .cell[data-value="1024"],
+        .cell[data-value="2048"] {
+            background: #edcf72;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>2048</h1>
+
+    <!-- The score and board are updated by JavaScript. -->
+    <p>Score: <span id="score">0</span></p>
+    <div id="board"></div>
+    <p id="message">Use the arrow keys to play.</p>
+    <button onclick="restart()">Restart</button>
+
+    <script>
+        // Zero means an empty cell; other numbers are tile values.
+        let board, score, gameOver;
+
+        function restart() {
+            // Start with an empty 4 × 4 board.
+            // equal to [[0,0,0,0], [0,0,0,0], [0,0,0,0], [0,0,0,0]]
+            board = Array.from({ length: 4 }, () => Array(4).fill(0));
+            score = 0;
+            gameOver = false;
+
+            // Create two starting tiles and show the board.
+            addTile();
+            addTile();
+            render();
+            document.querySelector("#message").textContent =
+                "Use the arrow keys to play.";
+        }
+
+        /**
+         * Find all empty cells, choose one at random, and place a new tile there.
+         */
+        function addTile() {
+            // Find every empty position.
+            const empty = [];
+            board.forEach((row, r) => row.forEach((value, c) => {
+                if (value === 0) empty.push([r, c]);
+            }));
+
+            // Choose one empty position at random.
+            if (empty.length) {
+                const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+
+                // A new tile is usually 2, but occasionally 4.
+                board[r][c] = Math.random() < 0.9 ? 2 : 4;
+            }
+        }
+
+        /**
+         * Move all tiles in the given direction, merging equal neighbors.
+         * 
+         * direction is either 'left', 'right', 'up', 'down'
+         */
+        function move(direction) {
+            if (gameOver) return;
+
+            // Keep a copy so we can tell whether anything actually moved.
+            const previous = JSON.stringify(board);
+
+            // Process each row or column in the direction of movement.
+            for (let i = 0; i < 4; i++) {
+                // Coordinates are listed from the moving edge inward.
+                const cells = Array.from({ length: 4 }, (_, j) =>
+                    direction === "left"  ? [i, j] :
+                    direction === "right" ? [i, 3 - j] :
+                    direction === "up"    ? [j, i] :
+                                            [3 - j, i]
+                );
+
+                // Read the line, remove empty cells, and keep its order.
+                let line = cells.map(([r, c]) => board[r][c])
+                                .filter(value => value !== 0);
+
+                // Merge equal neighboring tiles only once per move.
+                for (let j = 0; j < line.length - 1; j++) {
+                    if (line[j] === line[j + 1]) {
+                        line[j] *= 2;
+                        score += line[j];
+                        line.splice(j + 1, 1);
+                    }
+                }
+
+                // Add empty cells at the far end, then write the line back.
+                line = [...line, ...Array(4 - line.length).fill(0)];
+                cells.forEach(([r, c], j) => board[r][c] = line[j]);
+            }
+
+            // Only spawn a tile if the board really changed.
+            if (JSON.stringify(board) !== previous) {
+                addTile();
+                render();
+                checkGameOver();
+            }
+        }
+
+        function render() {
+            // Rebuild the board from its current numbers.
+            document.querySelector("#board").innerHTML = board.flat().map(value =>
+                `<div class="cell" data-value="${value || ""}">${value || ""}</div>`
+            ).join("");
+
+            document.querySelector("#score").textContent = score;
+        }
+
+        function checkGameOver() {
+            // An empty cell means at least one move is still possible.
+            if (board.some(row => row.includes(0))) return;
+
+            // Equal neighbors can still merge, so the game can continue.
+            for (let r = 0; r < 4; r++) {
+                for (let c = 0; c < 4; c++) {
+                    if (board[r][c] === board[r][c + 1] ||
+                        board[r][c] === board[r + 1]?.[c]) return;
+                }
+            }
+
+            // No empty cells or possible merges remain.
+            gameOver = true;
+            document.querySelector("#message").textContent = "Game over!";
+        }
+
+        // Convert arrow-key presses into moves.
+        document.addEventListener("keydown", event => {
+            const directions = {
+                ArrowLeft: "left",
+                ArrowRight: "right",
+                ArrowUp: "up",
+                ArrowDown: "down"
+            };
+
+            if (directions[event.key]) {
+                event.preventDefault();
+                move(directions[event.key]);
+            }
+        });
+
+        // Create a new game when the page first opens.
+        restart();
+    </script>
+</body>
+</html>
