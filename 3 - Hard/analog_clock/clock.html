@@ -1,0 +1,585 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <!-- Make the clock responsive on mobile devices. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Analog Clock</title>
+
+    <style>
+        /* --------------------------------------------------
+           1. GLOBAL STYLES
+           -------------------------------------------------- */
+
+        /*
+         * Include padding and borders in an element's declared
+         * width and height. This makes sizing more predictable.
+         */
+        * {
+            box-sizing: border-box;
+        }
+
+        /*
+         * Center the clock horizontally and vertically.
+         * min-height ensures the page fills the viewport.
+         */
+        body {
+            margin: 0;
+            min-height: 100vh;
+
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            background: #17212b;
+            font-family: Arial, sans-serif;
+        }
+
+
+        /* --------------------------------------------------
+           2. CLOCK FACE
+           -------------------------------------------------- */
+
+        .clock {
+            /*
+             * The clock can shrink on narrow screens but will
+             * never exceed 360px in width.
+             */
+            width: min(80vw, 360px);
+
+            /*
+             * Keep the clock perfectly circular regardless
+             * of its responsive width.
+             */
+            aspect-ratio: 1;
+
+            position: relative;
+
+            border: 8px solid #d5b98c;
+            border-radius: 50%;
+
+            background:
+                radial-gradient(circle, #fffdf6, #e9dfcb);
+
+            box-shadow:
+                0 12px 35px rgb(0 0 0 / 35%),
+                inset 0 0 12px rgb(0 0 0 / 10%);
+        }
+
+
+        /* --------------------------------------------------
+           3. TICK MARKS
+           -------------------------------------------------- */
+
+        /*
+         * Every tick is absolutely positioned relative to
+         * the clock face.
+         *
+         * Its top edge is placed at the top of the face's
+         * inner area. Rotating it around the center of the
+         * clock distributes all ticks around the perimeter.
+         *
+         * IMPORTANT:
+         * We use transform-origin: 50% 50% rather than a
+         * large percentage such as 900%. The rotation center
+         * is handled explicitly by the JavaScript below.
+         */
+        .tick {
+            position: absolute;
+
+            /* Center the tick horizontally at the top. */
+            left: 50%;
+            top: 0;
+
+            /* Each tick is a narrow vertical rectangle. */
+            width: 2px;
+            height: 7px;
+
+            background: #8a806e;
+            border-radius: 2px;
+
+            /*
+             * The element's own center is its rotation origin.
+             * JavaScript translates it to the clock's center
+             * before applying rotation.
+             */
+            transform-origin: 50% 50%;
+        }
+
+        /*
+         * Major ticks mark the twelve hours.
+         * They are longer and darker than minute ticks.
+         */
+        .tick.major {
+            width: 4px;
+            height: 14px;
+            background: #263746;
+        }
+
+
+        /* --------------------------------------------------
+           4. CLOCK NUMBERS
+           -------------------------------------------------- */
+
+        .number {
+            /*
+             * Position each number using its center rather
+             * than its top-left corner.
+             */
+            position: absolute;
+
+            width: 32px;
+            height: 32px;
+
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            color: #263746;
+            font-size: 20px;
+            font-weight: bold;
+
+            /*
+             * JavaScript supplies left and top as percentages.
+             * These negative margins center the number on
+             * the calculated clock position.
+             */
+            margin-left: -16px;
+            margin-top: -16px;
+        }
+
+
+        /* --------------------------------------------------
+           5. CLOCK HANDS
+           -------------------------------------------------- */
+
+        /*
+         * All hands share the same positioning strategy.
+         *
+         * left: 50% places their left edge at the horizontal
+         * center of the clock.
+         *
+         * bottom: 50% places their bottom edge at the
+         * vertical center of the clock.
+         *
+         * Their bottom ends therefore meet at the center.
+         */
+        .hand {
+            position: absolute;
+
+            left: 50%;
+            bottom: 50%;
+
+            border-radius: 100px;
+
+            /*
+             * Rotate around the bottom-center of each hand.
+             * This keeps the hand attached to the center pin.
+             */
+            transform-origin: 50% 100%;
+        }
+
+        /* Shortest hand: indicates the hour. */
+        .hour {
+            width: 8px;
+            height: 25%;
+
+            margin-left: -4px;
+
+            background: #263746;
+        }
+
+        /* Medium hand: indicates the minutes. */
+        .minute {
+            width: 5px;
+            height: 35%;
+
+            margin-left: -2.5px;
+
+            background: #526675;
+        }
+
+        /* Longest hand: indicates the seconds. */
+        .second {
+            width: 2px;
+            height: 40%;
+
+            margin-left: -1px;
+
+            background: #e74c3c;
+        }
+
+
+        /* --------------------------------------------------
+           6. CENTER PIN
+           -------------------------------------------------- */
+
+        /*
+         * The pin covers the meeting point of all three hands.
+         * It is placed above the hands using a higher z-index.
+         */
+        .center-pin {
+            position: absolute;
+
+            left: 50%;
+            top: 50%;
+
+            width: 14px;
+            height: 14px;
+
+            transform: translate(-50%, -50%);
+
+            background: #e74c3c;
+            border: 3px solid #fffdf6;
+            border-radius: 50%;
+
+            z-index: 10;
+        }
+
+
+        /* --------------------------------------------------
+           7. DIGITAL TIME DISPLAY
+           -------------------------------------------------- */
+
+        .digital-time {
+            position: absolute;
+
+            left: 50%;
+            bottom: 17%;
+
+            transform: translateX(-50%);
+
+            color: #526675;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 1px;
+
+            white-space: nowrap;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- The clock face contains its ticks, numbers, hands,
+         center pin, and digital time display. -->
+    <div class="clock" id="clock">
+
+        <!-- JavaScript creates all 60 tick marks here. -->
+        <div id="ticks"></div>
+
+        <!-- JavaScript creates the twelve hour numbers here. -->
+        <div id="numbers"></div>
+
+        <!-- The hands rotate independently using CSS transforms. -->
+        <div class="hand hour" id="hour-hand"></div>
+        <div class="hand minute" id="minute-hand"></div>
+        <div class="hand second" id="second-hand"></div>
+
+        <!-- This pin visually joins the hands at the center. -->
+        <div class="center-pin"></div>
+
+        <!-- A digital display provides a second way to read the time. -->
+        <div class="digital-time" id="digital-time"></div>
+
+    </div>
+
+    <script>
+        /* --------------------------------------------------
+           1. GET REFERENCES TO HTML ELEMENTS
+           -------------------------------------------------- */
+
+        /*
+         * Store the elements we will update or add children to.
+         * Keeping these references avoids repeatedly searching
+         * the document for the same elements.
+         */
+        const clock = document.getElementById("clock");
+        const ticksContainer = document.getElementById("ticks");
+        const numbersContainer = document.getElementById("numbers");
+
+        const hourHand = document.getElementById("hour-hand");
+        const minuteHand = document.getElementById("minute-hand");
+        const secondHand = document.getElementById("second-hand");
+
+        const digitalTime = document.getElementById("digital-time");
+
+
+        /* --------------------------------------------------
+           2. CREATE THE 60 TICK MARKS
+           -------------------------------------------------- */
+
+        /*
+         * An analog clock has 60 tick positions:
+         *
+         *   60 minute/second positions around the circle
+         *   12 major positions for the hours
+         *
+         * Every sixth tick is a major tick:
+         *   0, 6, 12, 18, ... 54
+         *
+         * The first tick is at 12 o'clock, and the remaining
+         * ticks proceed clockwise.
+         */
+        const tickCount = 60;
+
+        for (let i = 0; i < tickCount; i++) {
+
+            // Create one HTML element for this tick.
+            const tick = document.createElement("div");
+
+            /*
+             * Give every tick the basic "tick" class.
+             *
+             * Add "major" to ticks at multiples of five.
+             * The CSS makes these ticks longer and thicker.
+             */
+            tick.className = "tick";
+
+            if (i % 5 === 0) {
+                tick.classList.add("major");
+            }
+
+            /*
+             * Each tick is positioned at the top-center of
+             * the clock face before it is transformed.
+             *
+             * The transform combines:
+             *
+             * 1. translate(-50%, -50%)
+             *    Centers the tick's own midpoint on its
+             *    initial position.
+             *
+             * 2. translateY(radius)
+             *    Moves the tick downward from the clock center
+             *    to the top perimeter position.
+             *
+             * 3. rotate(angle)
+             *    Rotates that position around the center.
+             *
+             * We use a CSS variable for the radius. Its value
+             * is calculated from the clock's current size.
+             *
+             * The order of transform functions matters:
+             * the translation is rotated with the element,
+             * so the tick moves around the clock circumference.
+             */
+            const angle = i * 6;
+
+            tick.style.left = "50%";
+            tick.style.top = "50%";
+
+            tick.style.transform =
+                `translate(-50%, -50%) ` +
+                `rotate(${angle}deg) ` +
+                `translateY(calc(var(--tick-radius) * -1))`;
+
+            /*
+             * Add the new tick to the clock.
+             * The CSS variable --tick-radius is set below.
+             */
+            ticksContainer.appendChild(tick);
+        }
+
+
+        /* --------------------------------------------------
+           3. CALCULATE THE TICK RADIUS
+           -------------------------------------------------- */
+
+        /*
+         * The radius must be measured from the center of the
+         * clock to the position where the tick marks should sit.
+         *
+         * clientWidth includes the clock's padding but excludes
+         * its border. Half of this value is the inner radius.
+         *
+         * Subtract half the major tick length so that the
+         * center of each tick lies slightly inside the edge.
+         *
+         * ResizeObserver recalculates the radius if the clock
+         * changes size, such as when the browser window resizes.
+         */
+        function updateTickRadius() {
+            const radius = clock.clientWidth / 2 - 12;
+
+            clock.style.setProperty(
+                "--tick-radius",
+                `${radius}px`
+            );
+        }
+
+        /*
+         * Calculate the initial radius before the first render.
+         */
+        updateTickRadius();
+
+        /*
+         * Keep the tick positions correct when the clock's
+         * dimensions change.
+         */
+        const resizeObserver = new ResizeObserver(updateTickRadius);
+        resizeObserver.observe(clock);
+
+
+        /* --------------------------------------------------
+           4. CREATE THE TWELVE HOUR NUMBERS
+           -------------------------------------------------- */
+
+        /*
+         * Numbers are placed mathematically on a circle.
+         *
+         * For an angle measured clockwise from 12 o'clock:
+         *
+         *   x = centerX + radius * sin(angle)
+         *   y = centerY - radius * cos(angle)
+         *
+         * The minus sign in the y formula is necessary because
+         * CSS coordinates increase downward.
+         *
+         * A radius of 39% places the numbers inside the ticks.
+         */
+        const numberRadius = 39;
+
+        for (let n = 1; n <= 12; n++) {
+
+            // Create a number element and assign its text.
+            const number = document.createElement("div");
+            number.className = "number";
+            number.textContent = n;
+
+            /*
+             * Convert the hour number to radians.
+             * Each hour represents 30 degrees (360 / 12).
+             */
+            const angle = n * 30 * Math.PI / 180;
+
+            /*
+             * Calculate the number's position as percentages
+             * of the clock's width and height.
+             *
+             * The clock is circular, so the same radius works
+             * for both axes.
+             */
+            const x = 50 + numberRadius * Math.sin(angle);
+            const y = 50 - numberRadius * Math.cos(angle);
+
+            number.style.left = `${x}%`;
+            number.style.top = `${y}%`;
+
+            // Add the number to the clock face.
+            numbersContainer.appendChild(number);
+        }
+
+
+        /* --------------------------------------------------
+           5. UPDATE THE CLOCK HANDS
+           -------------------------------------------------- */
+
+        /*
+         * requestAnimationFrame calls this function repeatedly,
+         * allowing the second hand to move smoothly rather than
+         * jumping once per second.
+         *
+         * The browser provides a timestamp, but we use Date()
+         * because it gives the current system time directly.
+         */
+        function updateClock() {
+
+            // Read the current local date and time.
+            const now = new Date();
+
+            const milliseconds = now.getMilliseconds();
+            const seconds = now.getSeconds();
+            const minutes = now.getMinutes();
+            const hours = now.getHours();
+
+            /*
+             * SECOND HAND
+             *
+             * A full revolution is 360 degrees over 60 seconds:
+             *
+             *   360 / 60 = 6 degrees per second
+             *
+             * Include milliseconds so that the hand moves
+             * smoothly between whole seconds.
+             */
+            const secondAngle =
+                (seconds + milliseconds / 1000) * 6;
+
+            /*
+             * MINUTE HAND
+             *
+             * The minute hand moves 6 degrees per minute.
+             *
+             * Add seconds / 60 so that it gradually advances
+             * during the current minute instead of waiting
+             * for the next full minute.
+             */
+            const minuteAngle =
+                (minutes + seconds / 60) * 6;
+
+            /*
+             * HOUR HAND
+             *
+             * Each hour represents 30 degrees:
+             *
+             *   360 / 12 = 30 degrees per hour
+             *
+             * hours % 12 converts the 24-hour system to a
+             * 12-hour clock. Add minutes / 60 so that the
+             * hour hand gradually advances between hour marks.
+             */
+            const hourAngle =
+                (hours % 12 + minutes / 60) * 30;
+
+            /*
+             * Rotate each hand by its calculated angle.
+             *
+             * The hands' CSS transform-origin is at their
+             * bottom-center, so each rotates around the clock's
+             * center rather than around its own midpoint.
+             */
+            secondHand.style.transform =
+                `rotate(${secondAngle}deg)`;
+
+            minuteHand.style.transform =
+                `rotate(${minuteAngle}deg)`;
+
+            hourHand.style.transform =
+                `rotate(${hourAngle}deg)`;
+
+            /*
+             * Format the digital display as HH:MM:SS.
+             *
+             * padStart(2, "0") adds a leading zero when needed:
+             * 9 becomes "09", while 12 remains "12".
+             */
+            digitalTime.textContent =
+                `${String(hours).padStart(2, "0")}:` +
+                `${String(minutes).padStart(2, "0")}:` +
+                `${String(seconds).padStart(2, "0")}`;
+
+            /*
+             * Schedule the next update.
+             * The browser controls the actual refresh frequency.
+             */
+            requestAnimationFrame(updateClock);
+        }
+
+
+        /* --------------------------------------------------
+           6. START THE CLOCK
+           -------------------------------------------------- */
+
+        /*
+         * Start the continuous update loop.
+         * The clock immediately displays the current time.
+         */
+        requestAnimationFrame(updateClock);
+    </script>
+
+</body>
+</html>
