@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>2048</title>
+
+    <style>
+        /* Use a compact, centered layout with a warm color palette. */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: #faf8ef;
+            color: #776e65;
+            font-family: Arial, sans-serif;
+        }
+
+        main {
+            width: min(92vw, 420px);
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 64px;
+            color: #776e65;
+        }
+
+        /* Keep the score visible without adding extra interface elements. */
+        .score-box {
+            min-width: 85px;
+            padding: 10px;
+            border-radius: 5px;
+            background: #bbada0;
+            color: white;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .score-box span {
+            display: block;
+            margin-top: 4px;
+            font-size: 24px;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 16px 0;
+            gap: 10px;
+        }
+
+        button {
+            padding: 10px 14px;
+            border: 0;
+            border-radius: 5px;
+            background: #8f7a66;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #776452;
+        }
+
+        /* The board uses four equal columns and rows. */
+        #board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            padding: 10px;
+            border-radius: 6px;
+            background: #bbada0;
+            touch-action: none;
+            user-select: none;
+        }
+
+        /* Empty cells provide a consistent background for the tiles. */
+        .cell {
+            display: grid;
+            place-items: center;
+            aspect-ratio: 1;
+            border-radius: 4px;
+            background: rgba(238, 228, 218, 0.35);
+            font-size: clamp(20px, 7vw, 34px);
+            font-weight: bold;
+        }
+
+        /* Assign colors according to each tile's value. */
+        .v2    { background: #eee4da; }
+        .v4    { background: #ede0c8; }
+        .v8    { background: #f2b179; color: white; }
+        .v16   { background: #f59563; color: white; }
+        .v32   { background: #f67c5f; color: white; }
+        .v64   { background: #f65e3b; color: white; }
+        .v128  { background: #edcf72; color: white; font-size: 28px; }
+        .v256  { background: #edcc61; color: white; font-size: 28px; }
+        .v512  { background: #edc850; color: white; font-size: 28px; }
+        .v1024 { background: #edc53f; color: white; font-size: 23px; }
+        .v2048 { background: #edc22e; color: white; font-size: 23px; }
+
+        /* Make the instructions unobtrusive. */
+        p {
+            line-height: 1.5;
+        }
+
+        #message {
+            min-height: 24px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <header>
+            <h1>2048</h1>
+
+            <div class="score-box">
+                SCORE
+                <span id="score">0</span>
+            </div>
+        </header>
+
+        <div class="toolbar">
+            <span>Join the tiles. Reach 2048!</span>
+            <button id="restart">New Game</button>
+        </div>
+
+        <!-- JavaScript creates the sixteen cells inside this board. -->
+        <div id="board" aria-label="2048 game board"></div>
+
+        <p id="message" role="status">Use arrow keys or WASD to move.</p>
+        <p>Mouse: click a direction below. Touch: swipe the board.</p>
+
+        <!-- Direction buttons make mouse-only play possible. -->
+        <div class="toolbar" aria-label="Movement controls">
+            <button data-dir="up">↑</button>
+            <button data-dir="left">←</button>
+            <button data-dir="down">↓</button>
+            <button data-dir="right">→</button>
+        </div>
+    </main>
+
+    <script>
+        // The game board is a 4x4 array. Zero represents an empty cell.
+        const SIZE = 4;
+        let board = [];
+        let score = 0;
+        let finished = false;
+
+        // Cache the interface elements to avoid repeatedly querying the DOM.
+        const boardElement = document.querySelector("#board");
+        const scoreElement = document.querySelector("#score");
+        const messageElement = document.querySelector("#message");
+
+        // Create a fresh board and place two starting tiles.
+        function newGame() {
+            board = Array.from(
+                { length: SIZE },
+                () => Array(SIZE).fill(0)
+            );
+
+            score = 0;
+            finished = false;
+            messageElement.textContent = "Use arrow keys or WASD to move.";
+
+            addTile();
+            addTile();
+            render();
+        }
+
+        // Place a 2 (90% chance) or 4 (10% chance) in a random empty cell.
+        function addTile() {
+            const empty = [];
+
+            // Find all currently empty positions.
+            board.forEach((row, r) => {
+                row.forEach((value, c) => {
+                    if (value === 0) empty.push([r, c]);
+                });
+            });
+
+            // Do nothing if no empty cell remains.
+            if (empty.length === 0) return;
+
+            // Choose one available position uniformly at random.
+            const [r, c] = empty[Math.floor(Math.random() * empty.length)];
+
+            board[r][c] = Math.random() < 0.9 ? 2 : 4;
+        }
+
+        // Draw the current board and score in the HTML.
+        function render() {
+            boardElement.innerHTML = "";
+
+            board.flat().forEach(value => {
+                const cell = document.createElement("div");
+
+                cell.className = "cell";
+
+                if (value !== 0) {
+                    // Use the tile value as a CSS class for its color.
+                    cell.textContent = value;
+                    cell.classList.add(`v${value}`);
+                }
+
+                boardElement.appendChild(cell);
+            });
+
+            scoreElement.textContent = score;
+        }
+
+        // Slide a row toward the left and merge matching adjacent tiles.
+        function slideRow(row) {
+            // Remove empty spaces before processing merges.
+            const values = row.filter(value => value !== 0);
+            const result = [];
+
+            for (let i = 0; i < values.length; i++) {
+                // Merge each pair only once during a single move.
+                if (values[i] === values[i + 1]) {
+                    const merged = values[i] * 2;
+
+                    result.push(merged);
+                    score += merged;
+                    i++;
+                } else {
+                    result.push(values[i]);
+                }
+            }
+
+            // Restore the row to exactly four cells.
+            while (result.length < SIZE) result.push(0);
+
+            return result;
+        }
+
+        // Return a transposed copy so vertical moves can use row logic.
+        function transpose(grid) {
+            return grid[0].map((_, c) => grid.map(row => row[c]));
+        }
+
+        // Compare two boards to determine whether a move changed anything.
+        function boardsEqual(a, b) {
+            return a.every((row, r) =>
+                row.every((value, c) => value === b[r][c])
+            );
+        }
+
+        // Move all tiles in the requested direction.
+        function move(direction) {
+            if (finished) return;
+
+            const original = board.map(row => [...row]);
+
+            // Convert vertical movement into horizontal row movement.
+            if (direction === "up" || direction === "down") {
+                board = transpose(board);
+            }
+
+            // Moving right is equivalent to reversing each row,
+            // sliding left, and reversing the result.
+            if (direction === "right" || direction === "down") {
+                board = board.map(row => row.reverse());
+            }
+
+            // Apply the same merge logic to every row.
+            board = board.map(slideRow);
+
+            // Undo the temporary reversal.
+            if (direction === "right" || direction === "down") {
+                board = board.map(row => row.reverse());
+            }
+
+            // Restore the original orientation after vertical movement.
+            if (direction === "up" || direction === "down") {
+                board = transpose(board);
+            }
+
+            // Invalid moves neither spawn a tile nor change the score.
+            if (boardsEqual(original, board)) return;
+
+            addTile();
+            render();
+
+            // Stop the game if no legal moves remain.
+            if (isGameOver()) {
+                finished = true;
+                messageElement.textContent = "Game over! Start a new game.";
+            } else if (board.flat().includes(2048)) {
+                messageElement.textContent = "You reached 2048! Keep playing!";
+            } else {
+                messageElement.textContent = "Keep going!";
+            }
+        }
+
+        // A game ends only when the board is full and no pair can merge.
+        function isGameOver() {
+            if (board.flat().includes(0)) return false;
+
+            for (let r = 0; r < SIZE; r++) {
+                for (let c = 0; c < SIZE; c++) {
+                    // Check the right and lower neighbors.
+                    if (c + 1 < SIZE && board[r][c] === board[r][c + 1]) {
+                        return false;
+                    }
+
+                    if (r + 1 < SIZE && board[r][c] === board[r + 1][c]) {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        // Support arrow keys and WASD without scrolling the page.
+        document.addEventListener("keydown", event => {
+            const keys = {
+                ArrowUp: "up",
+                ArrowDown: "down",
+                ArrowLeft: "left",
+                ArrowRight: "right",
+                w: "up",
+                s: "down",
+                a: "left",
+                d: "right"
+            };
+
+            const direction = keys[event.key] || keys[event.key.toLowerCase()];
+
+            if (direction) {
+                event.preventDefault();
+                move(direction);
+            }
+        });
+
+        // Allow mouse clicks on the four direction buttons.
+        document.querySelectorAll("[data-dir]").forEach(button => {
+            button.addEventListener("click", () => {
+                move(button.dataset.dir);
+            });
+        });
+
+        // Start a new game when the restart button is clicked.
+        document.querySelector("#restart").addEventListener("click", newGame);
+
+        // Record the initial touch or mouse position for swipe detection.
+        let startX = 0;
+        let startY = 0;
+
+        boardElement.addEventListener("pointerdown", event => {
+            startX = event.clientX;
+            startY = event.clientY;
+        });
+
+        // Interpret a sufficiently large pointer movement as a swipe.
+        boardElement.addEventListener("pointerup", event => {
+            const dx = event.clientX - startX;
+            const dy = event.clientY - startY;
+
+            // Ignore tiny movements that are probably accidental taps.
+            if (Math.max(Math.abs(dx), Math.abs(dy)) < 25) return;
+
+            // The dominant axis determines the movement direction.
+            if (Math.abs(dx) > Math.abs(dy)) {
+                move(dx > 0 ? "right" : "left");
+            } else {
+                move(dy > 0 ? "down" : "up");
+            }
+        });
+
+        // Initialize the game when the page loads.
+        newGame();
+    </script>
+</body>
+</html>
+

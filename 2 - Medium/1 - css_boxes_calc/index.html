@@ -1,0 +1,121 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Number Sum</title>
+
+    <style>
+        /* Basic page styling. */
+        body {
+            font-family: Arial, sans-serif;
+            padding: 30px;
+        }
+
+        /* Arrange the boxes horizontally. */
+        .numbers {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        /* Hide the checkbox controls. */
+        .numbers input {
+            position: absolute;
+            opacity: 0;
+        }
+
+        /* Style each number box. */
+        .number {
+            width: 80px;
+            height: 80px;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #555;
+            border-radius: 5px;
+            font-size: 22px;
+            cursor: pointer;
+        }
+
+        /* Highlight selected boxes. */
+        .numbers input:checked + .number {
+            background-color: gold;
+            border: 5px solid #333;
+        }
+
+        /* Display the sum below the boxes. */
+        .result {
+            margin-top: 25px;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        /* Hide every sum by default. */
+        .result span {
+            display: none;
+        }
+
+        /* Show the result matching the selected combination. */
+        #n1:not(:checked) ~ #n2:not(:checked) ~ #n3:not(:checked) ~ #n4:not(:checked) ~ .result .s0,
+        #n1:checked       ~ #n2:not(:checked) ~ #n3:not(:checked) ~ #n4:not(:checked) ~ .result .s10,
+        #n1:not(:checked) ~ #n2:checked       ~ #n3:not(:checked) ~ #n4:not(:checked) ~ .result .s20,
+        #n1:not(:checked) ~ #n2:not(:checked) ~ #n3:checked       ~ #n4:not(:checked) ~ .result .sminus5,
+        #n1:not(:checked) ~ #n2:not(:checked) ~ #n3:not(:checked) ~ #n4:checked       ~ .result .sminus15,
+        #n1:checked       ~ #n2:checked       ~ #n3:not(:checked) ~ #n4:not(:checked) ~ .result .s30,
+        #n1:checked       ~ #n2:not(:checked) ~ #n3:checked       ~ #n4:not(:checked) ~ .result .s5,
+        #n1:checked       ~ #n2:not(:checked) ~ #n3:not(:checked) ~ #n4:checked       ~ .result .sminus5b,
+        #n1:not(:checked) ~ #n2:checked       ~ #n3:checked       ~ #n4:not(:checked) ~ .result .s15,
+        #n1:not(:checked) ~ #n2:checked       ~ #n3:not(:checked) ~ #n4:checked       ~ .result .s5b,
+        #n1:not(:checked) ~ #n2:not(:checked) ~ #n3:checked       ~ #n4:checked       ~ .result .sminus20,
+        #n1:checked       ~ #n2:checked       ~ #n3:checked       ~ #n4:not(:checked) ~ .result .s25,
+        #n1:checked       ~ #n2:checked       ~ #n3:not(:checked) ~ #n4:checked       ~ .result .s15b,
+        #n1:checked       ~ #n2:not(:checked) ~ #n3:checked       ~ #n4:checked       ~ .result .sminus10,
+        #n1:not(:checked) ~ #n2:checked       ~ #n3:checked       ~ #n4:checked       ~ .result .s0b,
+        #n1:checked       ~ #n2:checked       ~ #n3:checked       ~ #n4:checked       ~ .result .s10b {
+            display: inline;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Number Sum</h1>
+
+    <div class="numbers">
+        <input type="checkbox" id="n1">
+        <label class="number" for="n1">+10</label>
+
+        <input type="checkbox" id="n2">
+        <label class="number" for="n2">+20</label>
+
+        <input type="checkbox" id="n3">
+        <label class="number" for="n3">-5</label>
+
+        <input type="checkbox" id="n4">
+        <label class="number" for="n4">-15</label>
+
+        <div class="result">
+            Sum:
+            <span class="s0">0</span>
+            <span class="s10">10</span>
+            <span class="s20">20</span>
+            <span class="sminus5">-5</span>
+            <span class="sminus15">-15</span>
+            <span class="s30">30</span>
+            <span class="s5">5</span>
+            <span class="sminus5b">-5</span>
+            <span class="s15">15</span>
+            <span class="s5b">5</span>
+            <span class="sminus20">-20</span>
+            <span class="s25">25</span>
+            <span class="s15b">15</span>
+            <span class="sminus10">-10</span>
+            <span class="s0b">0</span>
+            <span class="s10b">10</span>
+        </div>
+    </div>
+
+</body>
+</html>

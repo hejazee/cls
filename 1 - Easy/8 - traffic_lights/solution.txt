@@ -1,0 +1,99 @@
+just append this:
+
+
+
+.light {
+    border-radius: 100%;
+    width: 40px;
+    height: 40px;
+    animation-duration: 8s;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
+}
+
+.red {
+    background-color: #f00;
+    opacity: 0.2;
+    animation-name: red-light;
+}
+
+.orange {
+    background-color: rgb(240, 174, 33);
+    opacity: 0.2;
+    animation-name: orange-light;
+}
+
+.green {
+    background-color: rgb(80, 214, 26);
+    opacity: 1;
+    animation-name: green-light;
+}
+
+/* Green: on for the first 4 seconds. */
+@keyframes green-light {
+    0% {
+        opacity: 1;
+    }
+
+    49.999% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.2;
+    }
+
+    100% {
+        opacity: 0.2;
+    }
+}
+
+/* Orange: on from 4 to 5 seconds. */
+@keyframes orange-light {
+    0% {
+        opacity: 0.2;
+    }
+
+    49.999% {
+        opacity: 0.2;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    62.499% {
+        opacity: 1;
+    }
+
+    62.5% {
+        opacity: 0.2;
+    }
+
+    100% {
+        opacity: 0.2;
+    }
+}
+
+/* Red: on from 5 to 8 seconds. */
+@keyframes red-light {
+    0% {
+        opacity: 0.2;
+    }
+
+    62.499% {
+        opacity: 0.2;
+    }
+
+    62.5% {
+        opacity: 1;
+    }
+
+    99.999% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0.2;
+    }
+}

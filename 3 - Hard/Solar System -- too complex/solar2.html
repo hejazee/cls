@@ -1,0 +1,806 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Solar System</title>
+
+    <style>
+        /* =========================================================
+           1. GLOBAL CONFIGURATION
+           =========================================================
+
+           This project uses HTML and CSS only. No JavaScript.
+
+           Architecture:
+           - .universe contains the complete scene.
+           - .system positions and tilts the solar system.
+           - .sun is the fixed central star.
+           - .orbit defines an orbital path.
+           - .revolution rotates a planet around the Sun.
+           - .planet defines the visual appearance of a planet.
+           - .moon-orbit and .moon-revolution control the Moon.
+
+           IMPORTANT:
+           The revolution layer rotates around the Sun.
+           The planet sphere itself has no rotation animation.
+        */
+
+        :root {
+            /* Main scene dimensions */
+            --scene-size: 1200px;
+            --camera-perspective: 1400px;
+
+            /* Global 3D appearance */
+            --orbit-tilt: 62deg;
+            --scene-rotation: -12deg;
+            --scene-scale: 0.95;
+
+            /* Animation reset settings */
+            --reset-duration: 0.4s;
+
+            /* Central star */
+            --sun-size: 82px;
+
+            /* Moon configuration */
+            --moon-orbit-radius: 33px;
+            --moon-period: 2.5s;
+            --moon-size: 10px;
+
+            /*
+             * PLANET CONFIGURATION
+             * -----------------------------------------------------
+             * Each planet is configured in its own CSS block below.
+             *
+             * To add another planet:
+             * 1. Define its orbit radius, orbital period, size,
+             *    background and glow in one configuration block.
+             * 2. Add its HTML orbit structure.
+             *
+             * The shared .orbit, .revolution and .planet rules
+             * automatically handle the new planet.
+             */
+        }
+
+        /* Use predictable width and height calculations. */
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+        }
+
+
+        /* =========================================================
+           2. BACKGROUND
+           ========================================================= */
+
+        body {
+            position: relative;
+            overflow: hidden;
+
+            background:
+                radial-gradient(
+                    ellipse at 50% 45%,
+                    #111e3c 0%,
+                    #060b19 65%,
+                    #01030a 100%
+                );
+
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        /*
+         * Small distant stars.
+         * Multiple radial gradients create a repeating star field.
+         */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: -10%;
+            z-index: 0;
+            pointer-events: none;
+
+            opacity: 0.7;
+            filter: blur(0.5px);
+
+            background-image:
+                radial-gradient(
+                    1px 1px at 8% 17%,
+                    rgba(255, 255, 255, 0.8) 50%,
+                    transparent 100%
+                ),
+                radial-gradient(
+                    1px 1px at 24% 63%,
+                    rgba(190, 215, 255, 0.7) 50%,
+                    transparent 100%
+                ),
+                radial-gradient(
+                    2px 2px at 42% 28%,
+                    rgba(255, 255, 255, 0.65) 50%,
+                    transparent 100%
+                ),
+                radial-gradient(
+                    1px 1px at 61% 79%,
+                    rgba(220, 230, 255, 0.7) 50%,
+                    transparent 100%
+                ),
+                radial-gradient(
+                    1px 1px at 78% 38%,
+                    rgba(255, 255, 255, 0.7) 50%,
+                    transparent 100%
+                ),
+                radial-gradient(
+                    2px 2px at 92% 72%,
+                    rgba(180, 205, 255, 0.6) 50%,
+                    transparent 100%
+                );
+
+            background-size: 310px 270px;
+            background-repeat: repeat;
+        }
+
+        /*
+         * Larger, softly blurred stars.
+         * This layer creates a subtle sense of depth.
+         */
+        body::after {
+            content: "";
+            position: fixed;
+            inset: -10%;
+            z-index: 0;
+            pointer-events: none;
+
+            opacity: 0.55;
+            filter: blur(2px);
+
+            background-image:
+                radial-gradient(
+                    4px 4px at 15% 35%,
+                    rgba(190, 210, 255, 0.5) 5%,
+                    rgba(150, 180, 255, 0.12) 45%,
+                    transparent 100%
+                ),
+                radial-gradient(
+                    5px 5px at 57% 18%,
+                    rgba(255, 255, 255, 0.45) 5%,
+                    rgba(180, 200, 255, 0.1) 45%,
+                    transparent 100%
+                ),
+                radial-gradient(
+                    4px 4px at 83% 66%,
+                    rgba(190, 215, 255, 0.45) 5%,
+                    rgba(150, 180, 255, 0.1) 45%,
+                    transparent 100%
+                );
+
+            background-size: 470px 390px;
+            background-repeat: repeat;
+        }
+
+
+        /* =========================================================
+           3. ANIMATION CONTROL
+           =========================================================
+
+           This checkbox provides a CSS-only reset button.
+
+           Checked:
+           - Planet animations are removed.
+           - Their revolution layers return to rotate(0deg).
+           - The transition makes the return visible.
+
+           Unchecked:
+           - The animations are enabled again.
+           - CSS starts each animation from its initial angle.
+
+           Keep the checkbox before .universe in the HTML because
+           the general sibling selector (~) depends on this order.
+        */
+
+        #restart-animation {
+            position: fixed;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .control-label {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+
+            padding: 11px 16px;
+
+            border: 1px solid #7186b5;
+            border-radius: 9px;
+
+            background: rgba(12, 20, 42, 0.92);
+            color: #edf3ff;
+
+            font-size: 14px;
+            cursor: pointer;
+            user-select: none;
+
+            transition:
+                background 0.2s,
+                border-color 0.2s;
+        }
+
+        .control-label:hover {
+            background: #1c2b4d;
+            border-color: #b4c9ff;
+        }
+
+        #restart-animation:focus-visible + .control-label {
+            outline: 2px solid #9ec5ff;
+            outline-offset: 3px;
+        }
+
+        .restart-icon {
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        /* Display the appropriate label for each checkbox state. */
+        .reset-text {
+            display: none;
+        }
+
+        #restart-animation:checked + .control-label .running-text {
+            display: none;
+        }
+
+        #restart-animation:checked + .control-label .reset-text {
+            display: inline;
+        }
+
+
+        /* =========================================================
+           4. SCENE AND CAMERA
+           ========================================================= */
+
+        .universe {
+            position: relative;
+            z-index: 1;
+
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            overflow: hidden;
+            perspective: var(--camera-perspective);
+        }
+
+        /*
+         * This element is the common coordinate system for all
+         * planets and orbital paths.
+         *
+         * rotateX tilts the orbital plane.
+         * rotateZ rotates the entire composition.
+         * scale adjusts the overall scene size.
+         */
+        .system {
+            position: relative;
+            flex: 0 0 auto;
+
+            width: var(--scene-size);
+            height: var(--scene-size);
+
+            transform:
+                rotateX(var(--orbit-tilt))
+                rotateZ(var(--scene-rotation))
+                scale(var(--scene-scale));
+
+            transform-style: preserve-3d;
+        }
+
+
+        /* =========================================================
+           5. SUN
+           ========================================================= */
+
+        .sun {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            z-index: 20;
+
+            width: var(--sun-size);
+            height: var(--sun-size);
+
+            border-radius: 50%;
+
+            /*
+             * Counter-rotate against the scene's X tilt.
+             * This is a static transform, not an animation.
+             */
+            transform:
+                translate(-50%, -50%)
+                rotateX(calc(-1 * var(--orbit-tilt)));
+
+            background:
+                radial-gradient(
+                    circle at 32% 27%,
+                    #fffde2 0%,
+                    #ffdb70 22%,
+                    #ff991e 56%,
+                    #ed3808 100%
+                );
+
+            box-shadow:
+                0 0 24px rgba(255, 192, 65, 0.95),
+                0 0 65px rgba(255, 130, 20, 0.8),
+                0 0 130px rgba(255, 65, 10, 0.4);
+        }
+
+        /* Soft solar halo surrounding the Sun. */
+        .sun::before {
+            content: "";
+            position: absolute;
+            inset: -45%;
+            z-index: -1;
+
+            border-radius: 50%;
+
+            background:
+                radial-gradient(
+                    circle,
+                    rgba(255, 166, 45, 0.2) 0%,
+                    rgba(255, 111, 30, 0.08) 45%,
+                    transparent 72%
+                );
+        }
+
+
+        /* =========================================================
+           6. SHARED ORBIT COMPONENT
+           =========================================================
+
+           Every planet uses the same .orbit class.
+
+           The orbit radius is supplied by a custom property on
+           that planet's configuration class.
+
+           Example:
+               .orbit-mercury {
+                   --orbit-radius: 70px;
+               }
+
+           The generic rule below automatically creates a circle
+           whose diameter is twice the configured radius.
+        */
+
+        .orbit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+
+            width: calc(var(--orbit-radius) * 2);
+            height: calc(var(--orbit-radius) * 2);
+
+            border: 1px solid rgba(160, 195, 255, 0.42);
+            border-radius: 50%;
+
+            transform: translate(-50%, -50%);
+            transform-style: preserve-3d;
+        }
+
+
+        /* =========================================================
+           7. SHARED REVOLUTION COMPONENT
+           =========================================================
+
+           Only this layer rotates.
+
+           The planet is positioned at the edge of its orbit.
+           Rotating the parent moves the planet around the Sun.
+
+           The animation duration comes from --orbit-period.
+           This means no planet-specific keyframes are required.
+        */
+
+        .revolution {
+            position: absolute;
+            inset: 0;
+
+            border-radius: 50%;
+            transform: rotate(0deg);
+            transform-origin: center;
+
+            transform-style: preserve-3d;
+
+            animation:
+                revolution
+                var(--orbit-period)
+                linear
+                infinite;
+
+            /*
+             * When animation is disabled, transition smoothly
+             * back to the starting angle.
+             */
+            transition:
+                transform var(--reset-duration) ease-in-out;
+        }
+
+        @keyframes revolution {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /*
+         * Reset every planet and the Moon when the checkbox
+         * is checked.
+         *
+         * Setting animation to none removes the active animation.
+         * The transform then returns to rotate(0deg).
+         */
+        #restart-animation:checked ~ .universe .revolution,
+        #restart-animation:checked ~ .universe .moon-revolution {
+            animation: none;
+            transform: rotate(0deg);
+        }
+
+
+        /* =========================================================
+           8. SHARED PLANET SPHERE
+           =========================================================
+
+           Every planet uses the same .planet class.
+
+           Its size, surface gradient and glow are configured
+           independently for each planet using custom properties.
+
+           No animation is applied to .planet itself, so the
+           planets do not spin around their own axes.
+        */
+
+        .planet {
+            position: absolute;
+            top: 50%;
+            left: 100%;
+
+            width: var(--planet-size);
+            height: var(--planet-size);
+
+            border-radius: 50%;
+
+            /*
+             * Counter-rotation keeps the sphere's visual surface
+             * facing the viewer instead of looking flattened.
+             */
+            transform:
+                translate(-50%, -50%)
+                rotateX(calc(-1 * var(--orbit-tilt)));
+
+            background: var(--planet-background);
+            box-shadow: var(--planet-glow);
+
+            transform-style: flat;
+            backface-visibility: visible;
+        }
+
+
+        /* =========================================================
+           9. PLANET CONFIGURATIONS
+           =========================================================
+
+           Add or edit planets in this section.
+
+           Each configuration defines:
+           - --orbit-radius: distance from the Sun to the planet.
+           - --orbit-period: time needed for one full revolution.
+           - --planet-size: sphere diameter.
+           - --planet-background: surface appearance.
+           - --planet-glow: optional surrounding light.
+
+           The shared component rules handle the rest.
+        */
+
+
+        /* ------------------------- MERCURY ----------------------- */
+
+        .orbit-mercury {
+            --orbit-radius: 70px;
+            --orbit-period: 2.5s;
+
+            --planet-size: 15px;
+
+            --planet-background:
+                radial-gradient(
+                    circle at 30% 25%,
+                    #e3e3e3 0%,
+                    #999999 55%,
+                    #444444 100%
+                );
+
+            --planet-glow:
+                0 0 9px rgba(210, 210, 210, 0.5);
+        }
+
+
+        /* -------------------------- EARTH ------------------------ */
+
+        .orbit-earth {
+            --orbit-radius: 180px;
+            --orbit-period: 10s;
+
+            --planet-size: 28px;
+
+            --planet-background:
+                radial-gradient(
+                    ellipse at 65% 35%,
+                    #5ed579 0 15%,
+                    transparent 17%
+                ),
+                radial-gradient(
+                    ellipse at 35% 65%,
+                    #4cae5c 0 18%,
+                    transparent 20%
+                ),
+                radial-gradient(
+                    circle at 30% 25%,
+                    #b6edff 0%,
+                    #318ce9 48%,
+                    #09275a 100%
+                );
+
+            --planet-glow:
+                0 0 16px rgba(57, 153, 255, 0.8);
+        }
+
+
+        /* =========================================================
+           10. MOON
+           =========================================================
+
+           The Moon is a satellite, not a planet orbiting the Sun
+           independently in this model.
+
+           Its .moon-orbit element is nested inside the Earth.
+           Therefore, the Moon's orbit follows Earth as Earth
+           revolves around the Sun.
+        */
+
+        .moon-orbit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+
+            width: calc(var(--moon-orbit-radius) * 2);
+            height: calc(var(--moon-orbit-radius) * 2);
+
+            border: 1px solid rgba(225, 235, 255, 0.8);
+            border-radius: 50%;
+
+            transform:
+                translate(-50%, -50%)
+                rotateX(var(--orbit-tilt));
+
+            transform-style: preserve-3d;
+        }
+
+        .moon-revolution {
+            position: absolute;
+            inset: 0;
+
+            border-radius: 50%;
+            transform: rotate(0deg);
+            transform-origin: center;
+
+            animation:
+                revolution
+                var(--moon-period)
+                linear
+                infinite;
+
+            transition:
+                transform var(--reset-duration) ease-in-out;
+
+            transform-style: preserve-3d;
+        }
+
+        .moon {
+            position: absolute;
+            top: 50%;
+            left: 100%;
+
+            width: var(--moon-size);
+            height: var(--moon-size);
+
+            border-radius: 50%;
+
+            transform:
+                translate(-50%, -50%)
+                rotateX(calc(-1 * var(--orbit-tilt)));
+
+            background:
+                radial-gradient(
+                    circle at 30% 25%,
+                    #ffffff 0%,
+                    #c8d0df 60%,
+                    #68748a 100%
+                );
+
+            box-shadow:
+                0 0 9px rgba(220, 230, 255, 0.8);
+        }
+
+
+        /* =========================================================
+           11. RESPONSIVE LAYOUT
+           =========================================================
+
+           Scale down the scene on smaller screens.
+
+           Orbit radii remain unchanged; the entire composition
+           is scaled together to preserve the layout.
+        */
+
+        @media (max-width: 1100px) {
+            .system {
+                transform:
+                    rotateX(var(--orbit-tilt))
+                    rotateZ(var(--scene-rotation))
+                    scale(0.68);
+            }
+        }
+
+        @media (max-width: 650px) {
+            .system {
+                transform:
+                    rotateX(var(--orbit-tilt))
+                    rotateZ(var(--scene-rotation))
+                    scale(0.43);
+            }
+
+            .control-label {
+                top: 12px;
+                right: 12px;
+
+                padding: 9px 12px;
+                font-size: 12px;
+            }
+        }
+
+        @media (max-height: 650px) and (min-width: 1101px) {
+            .system {
+                transform:
+                    rotateX(var(--orbit-tilt))
+                    rotateZ(var(--scene-rotation))
+                    scale(0.65);
+            }
+        }
+
+        /*
+         * Respect the operating system's reduced-motion setting.
+         * This pauses the orbital animations for accessibility.
+         */
+        @media (prefers-reduced-motion: reduce) {
+            .revolution,
+            .moon-revolution {
+                animation-play-state: paused;
+            }
+        }
+
+    </style>
+</head>
+
+<body>
+
+    <!-- =========================================================
+         ANIMATION RESET CONTROL
+         =========================================================
+
+         This checkbox must appear before .universe so that the
+         CSS sibling selector can target the scene.
+
+         Click once:
+         - Return all orbiting objects to their starting angles.
+
+         Click again:
+         - Restart the orbital animations from the beginning.
+    -->
+
+    <input type="checkbox" id="restart-animation">
+
+    <label class="control-label" for="restart-animation">
+        <span class="restart-icon" aria-hidden="true">↻</span>
+
+        <span class="running-text">Return to start</span>
+        <span class="reset-text">Restart animation</span>
+    </label>
+
+
+    <!-- =========================================================
+         SOLAR SYSTEM SCENE
+         ========================================================= -->
+
+    <main class="universe">
+
+        <div class="system">
+
+            <!-- The Sun stays fixed at the center of the scene. -->
+            <div class="sun"></div>
+
+
+            <!-- =================================================
+                 MERCURY
+                 =================================================
+
+                 Every planet follows the same HTML structure:
+
+                 .orbit
+                   └── .revolution
+                         └── .planet
+
+                 Its settings are read from .orbit-mercury in CSS.
+            -->
+
+            <div class="orbit orbit-mercury">
+                <div class="revolution">
+                    <div class="planet"></div>
+                </div>
+            </div>
+
+
+            <!-- =================================================
+                 EARTH AND THE MOON
+                 =================================================
+
+                 Earth uses the same three-layer structure.
+
+                 The Moon is nested inside Earth's planet element.
+                 This makes the Moon orbit Earth while Earth
+                 simultaneously revolves around the Sun.
+            -->
+
+            <div class="orbit orbit-earth">
+
+                <div class="revolution">
+
+                    <div class="planet">
+
+                        <!-- The Moon's orbital path around Earth. -->
+                        <div class="moon-orbit">
+
+                            <!-- The Moon's own revolution layer. -->
+                            <div class="moon-revolution">
+
+                                <!-- The Moon's visual sphere. -->
+                                <div class="moon"></div>
+
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+</body>
+</html>

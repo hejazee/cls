@@ -1,0 +1,276 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Define the character encoding for the document. -->
+    <meta charset="UTF-8">
+
+    <!-- Make the page adapt to the width of mobile devices. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Set the title displayed in the browser tab. -->
+    <title>TODO List</title>
+
+    <style>
+        /*
+         * Add vertical spacing between TODO items.
+         * Each item contains a checkbox and its associated label.
+         */
+        .todo {
+            margin-bottom: 12px;
+        }
+
+        /*
+         * Hide the default browser checkbox.
+         *
+         * The checkbox remains in the document and functional.
+         * Its state controls the visual appearance of the custom checkbox
+         * and the strikethrough effect.
+         *
+         * The associated label allows the user to toggle the checkbox
+         * by clicking the task text or the custom checkbox.
+         */
+        .todo input {
+            position: absolute;
+            opacity: 0;
+        }
+
+        /*
+         * Display the custom checkbox and task text on the same line.
+         *
+         * display: flex places the child elements horizontally.
+         * align-items: center vertically aligns them.
+         * gap adds space between the checkbox and the text.
+         * cursor: pointer indicates that the task is clickable.
+         */
+        .todo label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        /*
+         * Create the custom checkbox.
+         *
+         * The empty square replaces the browser's default checkbox.
+         * position: relative provides a positioning reference for
+         * the checkmark pseudo-element created below.
+         * flex-shrink: 0 prevents the square from becoming smaller
+         * when the available horizontal space is limited.
+         */
+        .checkmark {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #888;
+            border-radius: 3px;
+            flex-shrink: 0;
+            position: relative;
+
+            /*
+             * Animate changes to the checkbox background color.
+             * When selected, the square will turn green gradually.
+             */
+            transition: background-color 0.3s ease;
+        }
+
+        /*
+         * Draw the checkmark using a CSS pseudo-element.
+         *
+         * No checkmark character or image is required.
+         * Two borders form the tick when the element is rotated.
+         */
+        .checkmark::after {
+            /*
+             * Generate the pseudo-element even though it has
+             * no text content.
+             */
+            content: "";
+
+            /*
+             * Position the tick inside the checkbox.
+             * Its containing block is the .checkmark element.
+             */
+            position: absolute;
+            left: 5px;
+            top: 1px;
+
+            /*
+             * Define the dimensions of the tick.
+             */
+            width: 5px;
+            height: 10px;
+
+            /*
+             * Draw only the right and bottom borders.
+             * Rotating this shape creates a checkmark.
+             */
+            border: solid white;
+            border-width: 0 2px 2px 0;
+
+            /*
+             * Initially hide the tick by scaling it to zero.
+             * Rotate it 45 degrees to establish its final shape.
+             */
+            transform: rotate(45deg) scale(0);
+
+            /*
+             * Animate the tick when the checkbox is selected
+             * or deselected.
+             */
+            transition: transform 0.2s ease;
+        }
+
+        /*
+         * Prepare the task text for the custom strikethrough.
+         *
+         * position: relative makes the text the positioning reference
+         * for its ::after pseudo-element.
+         */
+        .text {
+            position: relative;
+        }
+
+        /*
+         * Create the strikethrough as a separate CSS element.
+         *
+         * Using a pseudo-element instead of text-decoration allows
+         * us to animate the line's width through transform.
+         */
+        .text::after {
+            /* Create an empty pseudo-element for the line. */
+            content: "";
+
+            /*
+             * Position the line relative to the task text.
+             * Place it approximately through the vertical center
+             * of the text to produce a strikethrough effect.
+             */
+            position: absolute;
+            top: 50%;
+            left: 0;
+
+            /*
+             * Make the line cover the full width of the text.
+             */
+            width: 100%;
+            height: 2px;
+
+            /* Set the color of the strikethrough. */
+            background: #888;
+
+            /*
+             * Initially collapse the line horizontally.
+             *
+             * scaleX(0) makes its visible width zero.
+             * transform-origin: left makes it grow from left to right
+             * when its scale changes to 1.
+             */
+            transform: scaleX(0);
+            transform-origin: left;
+
+            /*
+             * Smoothly animate the line's appearance and disappearance.
+             */
+            transition: transform 0.35s ease;
+        }
+
+        /*
+         * CHECKED STATE
+         *
+         * The adjacent sibling selector (+) selects the label
+         * immediately following a checked checkbox.
+         *
+         * When the checkbox is checked, change the custom square
+         * to green and make its border green as well.
+         */
+        .todo input:checked + label .checkmark {
+            background: #2a9d65;
+            border-color: #2a9d65;
+        }
+
+        /*
+         * Reveal the checkmark when the checkbox is checked.
+         *
+         * Scaling from zero to one makes the tick appear smoothly.
+         * The 45-degree rotation keeps the two visible borders
+         * in the correct orientation.
+         */
+        .todo input:checked + label .checkmark::after {
+            transform: rotate(45deg) scale(1);
+        }
+
+        /*
+         * Animate the strikethrough when the checkbox is checked.
+         *
+         * The line grows from left to right because its horizontal
+         * scale changes from zero to one.
+         *
+         * When the checkbox is unchecked, the rule no longer applies,
+         * so the transition animates the line back to zero width.
+         */
+        .todo input:checked + label .text::after {
+            transform: scaleX(1);
+        }
+
+        /*
+         * KEYBOARD ACCESSIBILITY
+         *
+         * The checkbox can also be focused using the keyboard.
+         * :focus-visible applies an outline when keyboard navigation
+         * makes a visible focus indicator appropriate.
+         *
+         * The outline appears around the custom checkbox rather than
+         * the visually hidden native checkbox.
+         */
+        .todo input:focus-visible + label .checkmark {
+            outline: 2px solid #2684ff;
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Main heading for the TODO list. -->
+    <h2>TODO List</h2>
+
+    <!--
+        First task.
+
+        The checkbox ID connects it to the label's for attribute.
+        Clicking the label toggles this checkbox without JavaScript.
+    -->
+    <div class="todo">
+        <input type="checkbox" id="task1">
+
+        <label for="task1">
+            <!-- The empty span displays the custom checkbox. -->
+            <span class="checkmark"></span>
+
+            <!-- The text span receives the animated strikethrough. -->
+            <span class="text">Learn HTML</span>
+        </label>
+    </div>
+
+    <!-- Second task, using a unique checkbox ID. -->
+    <div class="todo">
+        <input type="checkbox" id="task2">
+
+        <label for="task2">
+            <span class="checkmark"></span>
+            <span class="text">Learn CSS</span>
+        </label>
+    </div>
+
+    <!-- Third task, independent of the other checkboxes. -->
+    <div class="todo">
+        <input type="checkbox" id="task3">
+
+        <label for="task3">
+            <span class="checkmark"></span>
+            <span class="text">Build a webpage</span>
+        </label>
+    </div>
+
+</body>
+</html>

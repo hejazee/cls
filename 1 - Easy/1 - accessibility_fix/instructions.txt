@@ -1,0 +1,2 @@
+You have been provided with a single HTML page named accessibility.html in the provided-assets folder that has
+five common accessibility issues. Your task is to identify and implement a fix for these issues.

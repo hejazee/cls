@@ -1,0 +1,304 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Color Picker</title>
+
+    <style>
+        /* Use predictable dimensions for all elements. */
+        * {
+            box-sizing: border-box;
+        }
+
+        /* Center the content and provide basic spacing. */
+        body {
+            max-width: 840px;
+            margin: 0 auto;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+
+        /* Position the image and its overlays in one coordinate system. */
+        #image-wrapper {
+            position: relative;
+            line-height: 0;
+            cursor: crosshair;
+        }
+
+        /* Scale the image while preserving its aspect ratio. */
+        #source-image {
+            display: block;
+            width: 100%;
+            height: auto;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        /* Show the color currently under the mouse pointer. */
+        #magnifier {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border: 1px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            display: none;
+        }
+
+        /* Arrange the selected color preview and its HEX value. */
+        .result {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        /* Display a visual sample of the selected color. */
+        #color-preview {
+            width: 48px;
+            height: 48px;
+            flex-shrink: 0;
+            border: 1px solid #ccc;
+        }
+
+        /* Allow the color information to use the remaining space. */
+        .color-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        /* Make the hexadecimal value easy to read. */
+        #hex-value {
+            font-family: monospace;
+            font-size: 20px;
+        }
+
+        /*
+         * Create a temporary circle at the click position.
+         * JavaScript removes it when its animation finishes.
+         */
+        .ripple {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+            pointer-events: none;
+            transform: translate(-50%, -50%) scale(0);
+            animation: ripple-effect 450ms ease-out forwards;
+        }
+
+        /* Expand the circle and fade it out. */
+        @keyframes ripple-effect {
+            from {
+                transform: translate(-50%, -50%) scale(0);
+                opacity: 1;
+            }
+
+            to {
+                transform: translate(-50%, -50%) scale(5);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Page title and usage instructions. -->
+    <h1>Image Color Picker</h1>
+    <p>Move the mouse over the image to preview colors. Click to select one.</p>
+
+    <!-- Keep the image, color indicator, and click animation together. -->
+    <div id="image-wrapper">
+
+        <!-- Replace photo.jpg with the path to your image. -->
+        <img
+            id="source-image"
+            src="photo.jpg"
+            alt="Color picker source image"
+            crossorigin="anonymous"
+        >
+
+        <!-- This circle follows the pointer and displays the sampled color. -->
+        <div id="magnifier"></div>
+    </div>
+
+    <!-- Display the last color selected by clicking the image. -->
+    <div class="result">
+        <div id="color-preview"></div>
+
+        <div class="color-info">
+            <label for="hex-value">Selected color</label>
+            <div id="hex-value">#FFFFFF</div>
+        </div>
+    </div>
+
+    <script>
+        // Cache references to the page elements.
+        const image = document.getElementById('source-image');
+        const wrapper = document.getElementById('image-wrapper');
+        const magnifier = document.getElementById('magnifier');
+        const preview = document.getElementById('color-preview');
+        const hexValue = document.getElementById('hex-value');
+
+        /*
+         * Create an off-screen canvas to read the image's pixel data.
+         * The canvas is used for calculations and is not displayed.
+         */
+        const canvas = document.createElement('canvas');
+
+        // Hint that pixel data will be read repeatedly.
+        const context = canvas.getContext('2d', {
+            willReadFrequently: true
+        });
+
+        // Track whether the image is ready for pixel sampling.
+        let imageReady = false;
+
+        function prepareImage() {
+            // Stop if the image has not loaded or has no valid dimensions.
+            if (!image.complete || !image.naturalWidth) {
+                return;
+            }
+
+            // Match the canvas dimensions to the original image resolution.
+            canvas.width = image.naturalWidth;
+            canvas.height = image.naturalHeight;
+
+            try {
+                // Draw the original image onto the canvas.
+                context.drawImage(image, 0, 0);
+
+                // Test whether the browser permits access to pixel data.
+                context.getImageData(0, 0, 1, 1);
+                imageReady = true;
+            } catch (error) {
+                // Cross-origin restrictions may prevent reading image pixels.
+                imageReady = false;
+                console.error('Cannot read image pixels. Check CORS settings.', error);
+            }
+        }
+
+        // Prepare the canvas after the image finishes loading.
+        image.addEventListener('load', prepareImage);
+
+        // Also handle an image that loaded before the event listener was added.
+        if (image.complete) {
+            prepareImage();
+        }
+
+        function getColor(event) {
+            // Pixel sampling requires a successfully prepared image.
+            if (!imageReady) {
+                return null;
+            }
+
+            // Get the displayed image's position and dimensions.
+            const rect = image.getBoundingClientRect();
+
+            /*
+             * Convert viewport coordinates into original image pixel coordinates.
+             * naturalWidth and naturalHeight account for image scaling.
+             */
+            const x = Math.floor(
+                (event.clientX - rect.left) *
+                image.naturalWidth / rect.width
+            );
+
+            const y = Math.floor(
+                (event.clientY - rect.top) *
+                image.naturalHeight / rect.height
+            );
+
+            // Read the pixel's RGBA channels.
+            const pixel = context.getImageData(x, y, 1, 1).data;
+
+            // Return RGB values; the alpha channel is not needed for HEX RGB.
+            return {
+                r: pixel[0],
+                g: pixel[1],
+                b: pixel[2]
+            };
+        }
+
+        function toHex({ r, g, b }) {
+            /*
+             * Convert each decimal channel to two hexadecimal digits.
+             * For example, RGB(255, 0, 16) becomes #FF0010.
+             */
+            return '#' + [r, g, b]
+                .map(value => value.toString(16).padStart(2, '0'))
+                .join('')
+                .toUpperCase();
+        }
+
+        function displayColor(color) {
+            // Convert the sampled RGB color to a HEX string.
+            const hex = toHex(color);
+
+            // Update the color preview and its textual value.
+            preview.style.backgroundColor = hex;
+            hexValue.textContent = hex;
+        }
+
+        wrapper.addEventListener('mousemove', event => {
+            // Get the wrapper's position to calculate overlay coordinates.
+            const rect = wrapper.getBoundingClientRect();
+
+            // Position the indicator relative to the wrapper.
+            magnifier.style.left = `${event.clientX - rect.left}px`;
+            magnifier.style.top = `${event.clientY - rect.top}px`;
+            magnifier.style.display = 'block';
+
+            // Preview the color directly under the pointer.
+            const color = getColor(event);
+
+            if (color) {
+                magnifier.style.backgroundColor = toHex(color);
+            }
+        });
+
+        wrapper.addEventListener('mouseleave', () => {
+            // Hide the indicator when the pointer leaves the image.
+            magnifier.style.display = 'none';
+        });
+
+        wrapper.addEventListener('click', event => {
+            // Read the pixel at the clicked position.
+            const color = getColor(event);
+
+            // Update the selected color if pixel access is available.
+            if (color) {
+                displayColor(color);
+            }
+
+            /*
+             * Create a ripple at the exact click position.
+             * The animation is independent of whether pixel sampling succeeds.
+             */
+            const rect = wrapper.getBoundingClientRect();
+            const ripple = document.createElement('span');
+
+            // Apply the CSS animation defined by the ripple class.
+            ripple.className = 'ripple';
+
+            // Convert viewport coordinates into wrapper-relative coordinates.
+            ripple.style.left = `${event.clientX - rect.left}px`;
+            ripple.style.top = `${event.clientY - rect.top}px`;
+
+            // Add the animated circle above the image.
+            wrapper.appendChild(ripple);
+
+            // Remove the temporary element after its animation completes.
+            ripple.addEventListener('animationend', () => {
+                ripple.remove();
+            }, { once: true });
+        });
+    </script>
+
+</body>
+</html>

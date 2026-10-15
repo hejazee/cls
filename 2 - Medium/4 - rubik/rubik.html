@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rubik's Cube</title>
+
+    <style>
+        /* Reset sizing and center the cube on the page. */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            background: radial-gradient(circle, #243447, #0b111b);
+        }
+
+        /* Establish the perspective used to render the 3D cube. */
+        .scene {
+            width: 240px;
+            height: 240px;
+            perspective: 900px;
+        }
+
+        /* Keep all six faces in 3D space and animate the whole cube. */
+        .cube {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transform-style: preserve-3d;
+            animation: rotate-cube 8s linear infinite;
+        }
+
+        /* Arrange nine stickers in a 3x3 grid on each face. */
+        .face {
+            position: absolute;
+            inset: 0; /* shorthand for top, right, bottom, left */
+            display: grid;
+            grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+            gap: 5px;
+            padding: 5px;
+            border: 5px solid #111;
+            border-radius: 9px;
+            background: #111;
+            backface-visibility: hidden; /* set opacity: 0.5; to see the back faces */
+        }
+
+        /* Add subtle shading to give the stickers a beveled appearance. */
+        .tile {
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            border-radius: 5px;
+            box-shadow:
+                inset 2px 2px 3px rgba(255, 255, 255, 0.2),
+                inset -2px -2px 3px rgba(0, 0, 0, 0.12);
+        }
+
+        /* Define the six traditional Rubik's Cube colors. */
+        .white  { background: #f4f4f0; }
+        .yellow { background: #ffd500; }
+        .red    { background: #d91f26; }
+        .orange { background: #ff7800; }
+        .blue   { background: #1746d1; }
+        .green  { background: #159447; }
+
+        /*
+         * Each face is rotated into the correct orientation, then moved
+         * 120px from the center to form one side of the 240px cube.
+         *
+         * To understand the math, consider that the cube's center is at (0, 0, 0) and each face is 240px wide.
+         * The distance from the center to the middle of a face is half the width of the cube, or 120px.
+         * 
+         * To see in action, set this rule, and then re-apply the below rules one by one.
+         *
+         * .face {
+         *    backface-visibility: visible;
+         *    opacity: 0.6;
+         *    transform: none;
+         *  }
+         *  .cube {
+         *    animation: none;
+         *    transform: rotatex(30deg) rotatey(30deg);
+         *  }
+         */
+        .front  { transform: translateZ(120px); }
+        .back   { transform: rotateY(180deg) translateZ(120px); }
+        .right  { transform: rotateY(90deg) translateZ(120px); }
+        .left   { transform: rotateY(-90deg) translateZ(120px); }
+        .top    { transform: rotateX(90deg) translateZ(120px); }
+        .bottom { transform: rotateX(-90deg) translateZ(120px); }
+
+        /*
+         * The animation lasts 8 seconds:
+         * 0–4 seconds: one full X-axis rotation.
+         * 4–8 seconds: one full Y-axis rotation.
+         * The 360-degree endpoint preserves the orientation at the
+         * transition between phases and when the animation restarts.
+         */
+        @keyframes rotate-cube {
+            0% {
+                transform: rotateX(0deg) rotateY(0deg);
+            }
+
+            50% {
+                transform: rotateX(360deg) rotateY(0deg);
+            }
+
+            100% {
+                transform: rotateX(360deg) rotateY(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="scene">
+        <div class="cube">
+
+            <!-- Front face -->
+            <div class="face front">
+                <div class="tile red"></div>
+                <div class="tile red"></div>
+                <div class="tile red"></div>
+                <div class="tile red"></div>
+                <div class="tile red"></div>
+                <div class="tile red"></div>
+                <div class="tile red"></div>
+                <div class="tile red"></div>
+                <div class="tile red"></div>
+            </div>
+
+            <!-- Back face -->
+            <div class="face back">
+                <div class="tile orange"></div>
+                <div class="tile orange"></div>
+                <div class="tile orange"></div>
+                <div class="tile orange"></div>
+                <div class="tile orange"></div>
+                <div class="tile orange"></div>
+                <div class="tile orange"></div>
+                <div class="tile orange"></div>
+                <div class="tile orange"></div>
+            </div>
+
+            <!-- Right face -->
+            <div class="face right">
+                <div class="tile blue"></div>
+                <div class="tile blue"></div>
+                <div class="tile blue"></div>
+                <div class="tile blue"></div>
+                <div class="tile blue"></div>
+                <div class="tile blue"></div>
+                <div class="tile blue"></div>
+                <div class="tile blue"></div>
+                <div class="tile blue"></div>
+            </div>
+
+            <!-- Left face -->
+            <div class="face left">
+                <div class="tile green"></div>
+                <div class="tile green"></div>
+                <div class="tile green"></div>
+                <div class="tile green"></div>
+                <div class="tile green"></div>
+                <div class="tile green"></div>
+                <div class="tile green"></div>
+                <div class="tile green"></div>
+                <div class="tile green"></div>
+            </div>
+
+            <!-- Top face -->
+            <div class="face top">
+                <div class="tile white"></div>
+                <div class="tile white"></div>
+                <div class="tile white"></div>
+                <div class="tile white"></div>
+                <div class="tile white"></div>
+                <div class="tile white"></div>
+                <div class="tile white"></div>
+                <div class="tile white"></div>
+                <div class="tile white"></div>
+            </div>
+
+            <!-- Bottom face -->
+            <div class="face bottom">
+                <div class="tile yellow"></div>
+                <div class="tile yellow"></div>
+                <div class="tile yellow"></div>
+                <div class="tile yellow"></div>
+                <div class="tile yellow"></div>
+                <div class="tile yellow"></div>
+                <div class="tile yellow"></div>
+                <div class="tile yellow"></div>
+                <div class="tile yellow"></div>
+            </div>
+
+        </div>
+    </main>
+</body>
+</html>

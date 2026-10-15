@@ -1,0 +1,820 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Solar System</title>
+
+    <style>
+        /*
+         * ============================================================
+         * CONFIGURATION
+         * ============================================================
+         *
+         * This project uses HTML and CSS only.
+         * No JavaScript is required.
+         *
+         * Planets revolve around the Sun without rotating around
+         * their own axes. The Moon revolves around the Earth.
+         */
+
+        :root {
+            /* Overall scene dimensions */
+            --scene-size: 1200px;
+            --camera-perspective: 1400px;
+
+            /* Orbital plane and camera appearance */
+            --orbit-tilt: 62deg;
+            --scene-rotation: -12deg;
+            --scene-scale: 0.95;
+
+            /* Orbital radii */
+            --mercury-radius: 70px;
+            --venus-radius: 125px;
+            --earth-radius: 180px;
+            --mars-radius: 235px;
+            --jupiter-radius: 300px;
+            --saturn-radius: 365px;
+            --uranus-radius: 430px;
+            --neptune-radius: 495px;
+            --pluto-radius: 550px;
+
+            /*
+             * Orbital periods in seconds per revolution.
+             *
+             * Mercury: 4 revolutions per 10 seconds.
+             * Venus:   2 revolutions per 10 seconds.
+             * Earth:   1 revolution per 10 seconds.
+             * Mars:    1.5 revolutions per 10 seconds.
+             * Jupiter: 0.5 revolutions per 10 seconds.
+             * Saturn:  0.2 revolutions per 10 seconds.
+             * Uranus:  0.1 revolutions per 10 seconds.
+             * Neptune: 0.1 revolutions per 10 seconds.
+             */
+
+            --mercury-period: 2.5s;
+            --venus-period: 5s;
+            --earth-period: 10s;
+            --mars-period: 6.666667s;
+            --jupiter-period: 20s;
+            --saturn-period: 50s;
+            --uranus-period: 100s;
+            --neptune-period: 100s;
+            --pluto-period: 120s;
+
+            /* Moon's orbital period around Earth */
+            --moon-period: 2.5s;
+
+            /* Global animation control */
+            --animation-state: running;
+        }
+
+        /* Predictable element dimensions */
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+        }
+
+        /* ============================================================
+           BACKGROUND
+           ============================================================ */
+
+        body {
+            overflow: hidden;
+            position: relative;
+
+            background:
+                radial-gradient(
+                    ellipse at 50% 45%,
+                    #111e3c 0%,
+                    #060b19 65%,
+                    #01030a 100%
+                );
+
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        /*
+         * Small distant stars.
+         * The repeated gradients create a CSS-only star field.
+         */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: -10%;
+            z-index: 0;
+            pointer-events: none;
+
+            opacity: 0.7;
+            filter: blur(0.5px);
+
+            background-image:
+                radial-gradient(
+                    1px 1px at 8% 17%,
+                    rgba(255, 255, 255, 0.8) 50%,
+                    transparent 100%
+                ),
+                radial-gradient(
+                    1px 1px at 24% 63%,
+                    rgba(190, 215, 255, 0.7) 50%,
+                    transparent 100%
+                ),
+                radial-gradient(
+                    2px 2px at 42% 28%,
+                    rgba(255, 255, 255, 0.65) 50%,
+                    transparent 100%
+                ),
+                radial-gradient(
+                    1px 1px at 61% 79%,
+                    rgba(220, 230, 255, 0.7) 50%,
+                    transparent 100%
+                ),
+                radial-gradient(
+                    1px 1px at 78% 38%,
+                    rgba(255, 255, 255, 0.7) 50%,
+                    transparent 100%
+                ),
+                radial-gradient(
+                    2px 2px at 92% 72%,
+                    rgba(180, 205, 255, 0.6) 50%,
+                    transparent 100%
+                );
+
+            background-size: 310px 270px;
+            background-repeat: repeat;
+        }
+
+        /* Larger, softly blurred stars */
+        body::after {
+            content: "";
+            position: fixed;
+            inset: -10%;
+            z-index: 0;
+            pointer-events: none;
+
+            opacity: 0.55;
+            filter: blur(2px);
+
+            background-image:
+                radial-gradient(
+                    4px 4px at 15% 35%,
+                    rgba(190, 210, 255, 0.5) 5%,
+                    rgba(150, 180, 255, 0.12) 45%,
+                    transparent 100%
+                ),
+                radial-gradient(
+                    5px 5px at 57% 18%,
+                    rgba(255, 255, 255, 0.45) 5%,
+                    rgba(180, 200, 255, 0.1) 45%,
+                    transparent 100%
+                ),
+                radial-gradient(
+                    4px 4px at 83% 66%,
+                    rgba(190, 215, 255, 0.45) 5%,
+                    rgba(150, 180, 255, 0.1) 45%,
+                    transparent 100%
+                );
+
+            background-size: 470px 390px;
+            background-repeat: repeat;
+        }
+
+        /* ============================================================
+           SCENE
+           ============================================================ */
+
+        .universe {
+            position: relative;
+            z-index: 1;
+
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            overflow: hidden;
+            perspective: var(--camera-perspective);
+        }
+
+        /*
+         * The whole scene is tilted to create a 3D impression.
+         * The planet spheres themselves are kept circular by
+         * counter-rotating their visual layer against the X tilt.
+         */
+        .system {
+            position: relative;
+            flex: 0 0 auto;
+
+            width: var(--scene-size);
+            height: var(--scene-size);
+
+            transform:
+                rotateX(var(--orbit-tilt))
+                rotateZ(var(--scene-rotation))
+                scale(var(--scene-scale));
+
+            transform-style: preserve-3d;
+        }
+
+        /* ============================================================
+           SUN
+           ============================================================ */
+
+        .sun {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            z-index: 20;
+
+            width: 82px;
+            height: 82px;
+            border-radius: 50%;
+
+            /*
+             * Counter-rotate against the orbital plane's tilt.
+             * This is a static transform, not an animation.
+             */
+            transform:
+                translate(-50%, -50%)
+                rotateX(calc(-1 * var(--orbit-tilt)));
+
+            background:
+                radial-gradient(
+                    circle at 32% 27%,
+                    #fffde2 0%,
+                    #ffdb70 22%,
+                    #ff991e 56%,
+                    #ed3808 100%
+                );
+
+            box-shadow:
+                0 0 24px rgba(255, 192, 65, 0.95),
+                0 0 65px rgba(255, 130, 20, 0.8),
+                0 0 130px rgba(255, 65, 10, 0.4);
+        }
+
+        /* Soft solar halo */
+        .sun::before {
+            content: "";
+            position: absolute;
+            inset: -45%;
+            z-index: -1;
+            border-radius: 50%;
+
+            background: radial-gradient(
+                circle,
+                rgba(255, 166, 45, 0.2) 0%,
+                rgba(255, 111, 30, 0.08) 45%,
+                transparent 72%
+            );
+        }
+
+        /* ============================================================
+           ORBITAL PATHS
+           ============================================================ */
+
+        /*
+         * The orbit paths are static circles.
+         * Their apparent ellipse shape comes from the tilted scene.
+         */
+        .orbit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+
+            border: 1px solid rgba(160, 195, 255, 0.42);
+            border-radius: 50%;
+
+            transform: translate(-50%, -50%);
+            transform-style: preserve-3d;
+        }
+
+        .orbit-mercury {
+            width: calc(var(--mercury-radius) * 2);
+            height: calc(var(--mercury-radius) * 2);
+        }
+
+        .orbit-venus {
+            width: calc(var(--venus-radius) * 2);
+            height: calc(var(--venus-radius) * 2);
+        }
+
+        .orbit-earth {
+            width: calc(var(--earth-radius) * 2);
+            height: calc(var(--earth-radius) * 2);
+        }
+
+        .orbit-mars {
+            width: calc(var(--mars-radius) * 2);
+            height: calc(var(--mars-radius) * 2);
+        }
+
+        .orbit-jupiter {
+            width: calc(var(--jupiter-radius) * 2);
+            height: calc(var(--jupiter-radius) * 2);
+        }
+
+        .orbit-saturn {
+            width: calc(var(--saturn-radius) * 2);
+            height: calc(var(--saturn-radius) * 2);
+        }
+
+        .orbit-uranus {
+            width: calc(var(--uranus-radius) * 2);
+            height: calc(var(--uranus-radius) * 2);
+        }
+
+        .orbit-neptune {
+            width: calc(var(--neptune-radius) * 2);
+            height: calc(var(--neptune-radius) * 2);
+        }
+
+        .orbit-pluto {
+            width: calc(var(--pluto-radius) * 2);
+            height: calc(var(--pluto-radius) * 2);
+
+            border-style: dashed;
+            border-color: rgba(190, 170, 230, 0.4);
+        }
+
+        /* ============================================================
+           ORBITAL ANIMATIONS
+           ============================================================ */
+
+        /*
+         * Only this layer rotates.
+         *
+         * The planet is positioned at the edge of the orbit.
+         * Rotating this parent moves the planet around the Sun.
+         * No animation is applied to the planet's own sphere.
+         */
+        .revolution {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+
+            animation-name: revolution;
+            animation-timing-function: linear;
+            animation-iteration-count: infinite;
+            animation-play-state: var(--animation-state);
+
+            transform-style: preserve-3d;
+        }
+
+        .revolution-mercury {
+            animation-duration: var(--mercury-period);
+        }
+
+        .revolution-venus {
+            animation-duration: var(--venus-period);
+        }
+
+        .revolution-earth {
+            animation-duration: var(--earth-period);
+        }
+
+        .revolution-mars {
+            animation-duration: var(--mars-period);
+        }
+
+        .revolution-jupiter {
+            animation-duration: var(--jupiter-period);
+        }
+
+        .revolution-saturn {
+            animation-duration: var(--saturn-period);
+        }
+
+        .revolution-uranus {
+            animation-duration: var(--uranus-period);
+        }
+
+        .revolution-neptune {
+            animation-duration: var(--neptune-period);
+        }
+
+        .revolution-pluto {
+            animation-duration: var(--pluto-period);
+        }
+
+        @keyframes revolution {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ============================================================
+           PLANET SPHERES
+           ============================================================ */
+
+        /*
+         * These elements do not have their own animations.
+         * Their position changes only because their parent
+         * revolution layer rotates.
+         *
+         * Counter-rotation here is static: it keeps the visual
+         * sphere circular instead of making it look flattened.
+         */
+        .planet {
+            position: absolute;
+            top: 50%;
+            left: 100%;
+
+            border-radius: 50%;
+
+            transform:
+                translate(-50%, -50%)
+                rotateX(calc(-1 * var(--orbit-tilt)));
+
+            transform-style: flat;
+            backface-visibility: visible;
+        }
+
+        /* Mercury */
+        .mercury {
+            width: 15px;
+            height: 15px;
+
+            background:
+                radial-gradient(
+                    circle at 30% 25%,
+                    #e3e3e3 0%,
+                    #999999 55%,
+                    #444444 100%
+                );
+
+            box-shadow: 0 0 9px rgba(210, 210, 210, 0.5);
+        }
+
+        /* Venus */
+        .venus {
+            width: 23px;
+            height: 23px;
+
+            background:
+                radial-gradient(
+                    circle at 30% 25%,
+                    #fff2c8 0%,
+                    #e6b16a 55%,
+                    #87512c 100%
+                );
+
+            box-shadow: 0 0 13px rgba(255, 190, 100, 0.45);
+        }
+
+        /* Earth */
+        .earth {
+            width: 28px;
+            height: 28px;
+
+            background:
+                radial-gradient(
+                    ellipse at 65% 35%,
+                    #5ed579 0 15%,
+                    transparent 17%
+                ),
+                radial-gradient(
+                    ellipse at 35% 65%,
+                    #4cae5c 0 18%,
+                    transparent 20%
+                ),
+                radial-gradient(
+                    circle at 30% 25%,
+                    #b6edff 0%,
+                    #318ce9 48%,
+                    #09275a 100%
+                );
+
+            box-shadow: 0 0 16px rgba(57, 153, 255, 0.8);
+            z-index: 5;
+        }
+
+        /* Mars */
+        .mars {
+            width: 20px;
+            height: 20px;
+
+            background:
+                radial-gradient(
+                    circle at 30% 25%,
+                    #ffd1a1 0%,
+                    #d75b38 55%,
+                    #68251b 100%
+                );
+
+            box-shadow: 0 0 10px rgba(230, 95, 60, 0.5);
+        }
+
+        /* Jupiter */
+        .jupiter {
+            width: 48px;
+            height: 48px;
+
+            background:
+                repeating-linear-gradient(
+                    0deg,
+                    #d9b895 0px,
+                    #d9b895 5px,
+                    #a96f4d 6px,
+                    #f0d5af 10px,
+                    #c38d63 14px
+                );
+
+            box-shadow: 0 0 18px rgba(225, 175, 125, 0.35);
+        }
+
+        /* Saturn */
+        .saturn {
+            width: 39px;
+            height: 39px;
+
+            background:
+                repeating-linear-gradient(
+                    0deg,
+                    #e7d09b 0px,
+                    #e7d09b 6px,
+                    #c19a5c 7px,
+                    #f1dfb5 12px
+                );
+
+            box-shadow: 0 0 15px rgba(235, 200, 130, 0.35);
+            z-index: 2;
+        }
+
+        /*
+         * Saturn's ring is a static decorative element.
+         * It does not rotate around Saturn.
+         */
+        .saturn-ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+
+            width: 74px;
+            height: 27px;
+
+            border: 7px solid rgba(211, 185, 137, 0.9);
+            border-left-color: rgba(244, 224, 180, 0.8);
+            border-right-color: rgba(156, 126, 87, 0.85);
+            border-radius: 50%;
+
+            transform:
+                translate(-50%, -50%)
+                rotate(-18deg);
+
+            pointer-events: none;
+        }
+
+        /* Uranus */
+        .uranus {
+            width: 34px;
+            height: 34px;
+
+            background:
+                radial-gradient(
+                    circle at 30% 25%,
+                    #d5ffff 0%,
+                    #80d9e4 50%,
+                    #287e9d 100%
+                );
+
+            box-shadow: 0 0 14px rgba(110, 225, 240, 0.45);
+        }
+
+        /* Neptune */
+        .neptune {
+            width: 34px;
+            height: 34px;
+
+            background:
+                radial-gradient(
+                    circle at 30% 25%,
+                    #86c5ff 0%,
+                    #326ce0 50%,
+                    #10265f 100%
+                );
+
+            box-shadow: 0 0 15px rgba(70, 120, 255, 0.5);
+        }
+
+        /* Pluto */
+        .pluto {
+            width: 12px;
+            height: 12px;
+
+            background:
+                radial-gradient(
+                    circle at 30% 25%,
+                    #f1d9c5 0%,
+                    #b69a89 60%,
+                    #65514c 100%
+                );
+
+            box-shadow: 0 0 7px rgba(230, 210, 190, 0.45);
+        }
+
+        /* ============================================================
+           MOON
+           ============================================================ */
+
+        /*
+         * The Moon has its own orbital path around Earth.
+         * It does not cause Earth to rotate around its own axis.
+         */
+        .moon-orbit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+
+            width: 66px;
+            height: 66px;
+
+            border: 1px solid rgba(225, 235, 255, 0.8);
+            border-radius: 50%;
+
+            transform:
+                translate(-50%, -50%)
+                rotateX(var(--orbit-tilt));
+
+            transform-style: preserve-3d;
+        }
+
+        .moon-revolution {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+
+            animation:
+                revolution
+                var(--moon-period)
+                linear
+                infinite;
+
+            animation-play-state: var(--animation-state);
+            transform-style: preserve-3d;
+        }
+
+        .moon {
+            position: absolute;
+            top: 50%;
+            left: 100%;
+
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+
+            transform:
+                translate(-50%, -50%)
+                rotateX(calc(-1 * var(--orbit-tilt)));
+
+            background:
+                radial-gradient(
+                    circle at 30% 25%,
+                    #ffffff 0%,
+                    #c8d0df 60%,
+                    #68748a 100%
+                );
+
+            box-shadow: 0 0 9px rgba(220, 230, 255, 0.8);
+        }
+
+        /* ============================================================
+           RESPONSIVE SCALING
+           ============================================================ */
+
+        @media (max-width: 1100px) {
+            .system {
+                transform:
+                    rotateX(var(--orbit-tilt))
+                    rotateZ(var(--scene-rotation))
+                    scale(0.68);
+            }
+        }
+
+        @media (max-width: 650px) {
+            .system {
+                transform:
+                    rotateX(var(--orbit-tilt))
+                    rotateZ(var(--scene-rotation))
+                    scale(0.43);
+            }
+        }
+
+        @media (max-height: 650px) and (min-width: 1101px) {
+            .system {
+                transform:
+                    rotateX(var(--orbit-tilt))
+                    rotateZ(var(--scene-rotation))
+                    scale(0.65);
+            }
+        }
+
+        /*
+         * To pause the orbital animations manually, set
+         * --animation-state: paused in :root.
+         */
+        @media (prefers-reduced-motion: reduce) {
+            .revolution,
+            .moon-revolution {
+                animation-play-state: paused;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="universe">
+        <div class="system">
+
+            <!-- Fixed central star -->
+            <div class="sun"></div>
+
+            <!-- Mercury -->
+            <div class="orbit orbit-mercury">
+                <div class="revolution revolution-mercury">
+                    <div class="planet mercury"></div>
+                </div>
+            </div>
+
+            <!-- Venus -->
+            <div class="orbit orbit-venus">
+                <div class="revolution revolution-venus">
+                    <div class="planet venus"></div>
+                </div>
+            </div>
+
+            <!-- Earth and its Moon -->
+            <div class="orbit orbit-earth">
+                <div class="revolution revolution-earth">
+                    <div class="planet earth">
+                        <div class="moon-orbit">
+                            <div class="moon-revolution">
+                                <div class="moon"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mars -->
+            <div class="orbit orbit-mars">
+                <div class="revolution revolution-mars">
+                    <div class="planet mars"></div>
+                </div>
+            </div>
+
+            <!-- Jupiter -->
+            <div class="orbit orbit-jupiter">
+                <div class="revolution revolution-jupiter">
+                    <div class="planet jupiter"></div>
+                </div>
+            </div>
+
+            <!-- Saturn and its static ring -->
+            <div class="orbit orbit-saturn">
+                <div class="revolution revolution-saturn">
+                    <div class="planet saturn">
+                        <div class="saturn-ring"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Uranus -->
+            <div class="orbit orbit-uranus">
+                <div class="revolution revolution-uranus">
+                    <div class="planet uranus"></div>
+                </div>
+            </div>
+
+            <!-- Neptune -->
+            <div class="orbit orbit-neptune">
+                <div class="revolution revolution-neptune">
+                    <div class="planet neptune"></div>
+                </div>
+            </div>
+
+            <!-- Pluto -->
+            <div class="orbit orbit-pluto">
+                <div class="revolution revolution-pluto">
+                    <div class="planet pluto"></div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</body>
+</html>

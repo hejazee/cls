@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Text Input Color Change</title>
+
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #f5f5f5;
+            font-family: sans-serif;
+        }
+
+        input {
+            padding: 12px 16px;
+            font-size: 18px;
+            border: 2px solid #cccccc;
+            border-radius: 8px;
+            background-color: white;
+            outline: none;
+            transition: background-color 0.3s;
+        }
+
+        /* Highlight the input when its value matches exactly. */
+        input.match {
+            background-color: #90ee90;
+        }
+    </style>
+</head>
+<body>
+
+    <input type="text" id="text-input" placeholder="Type something...">
+
+    <script>
+        const input = document.querySelector("#text-input");
+
+        // Change the background only when the text is exactly "something".
+        input.addEventListener("input", () => {
+            input.classList.toggle("match", input.value === "something");
+        });
+    </script>
+
+</body>
+</html>

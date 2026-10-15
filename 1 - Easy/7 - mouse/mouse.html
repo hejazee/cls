@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Smooth Mouse Follower</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #ffffff;
+        }
+
+        /* A hollow circle that smoothly follows the mouse pointer. */
+        #follower {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 30px;
+            height: 30px;
+            border: 2px solid #000000;
+            border-radius: 50%;
+            background: transparent;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Run the complete click effect in half a second. */
+        #follower.active {
+            animation: click-effect 500ms ease-in-out;
+        }
+
+        /* Enlarge and color the outline, then return to the initial state. */
+        @keyframes click-effect {
+            0%, 100% {
+                width: 30px;
+                height: 30px;
+                border-color: #000000;
+            }
+
+            50% {
+                width: 60px;
+                height: 60px;
+                border-color: #ffeb00;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="follower"></div>
+
+    <script>
+        const follower = document.querySelector("#follower");
+
+        // Track the actual pointer position and the circle's current position.
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+        let currentX = mouseX;
+        let currentY = mouseY;
+
+        // Update the target coordinates whenever the mouse moves.
+        document.addEventListener("mousemove", event => {
+            mouseX = event.clientX;
+            mouseY = event.clientY;
+        });
+
+        // Smoothly interpolate the circle's position toward the pointer.
+        function animate() {
+            const speed = 0.25;
+
+            currentX += (mouseX - currentX) * speed;
+            currentY += (mouseY - currentY) * speed;
+
+            follower.style.left = `${currentX}px`;
+            follower.style.top = `${currentY}px`;
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        // Restart the click animation on every click.
+        document.addEventListener("click", () => {
+            follower.classList.remove("active");
+
+            // Force the browser to restart the animation.
+            // reading the value of follower.offsetWidth forces the browser to recalculare the layout of element
+            // Otherwise, the browser may batch these changes and never observe an intermediate state in which the animation class is absent.
+            // void, means we don't want the actual read value.
+            void follower.offsetWidth;
+
+            follower.classList.add("active");
+        });
+
+        // Remove the animation class after it finishes.
+        follower.addEventListener("animationend", () => {
+            follower.classList.remove("active");
+        });
+    </script>
+
+</body>
+</html>

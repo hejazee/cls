@@ -1,0 +1,8 @@
+Without touching the HTML code and without using JavaScript, reproduce a traffic light cycle from the provided
+template (see example):
+
+- Green: four seconds
+- Orange: one second
+- Red: three seconds
+
+An inactive light must have an opacity of 20 %. This cycle must repeat infinitely.

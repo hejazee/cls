@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Timer</title>
+
+    <style>
+        /* Basic page layout and dark theme. */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #111;
+            color: #eee;
+            font-family: Arial, sans-serif;
+        }
+
+        /* Center the timer and its buttons. */
+        .timer {
+            text-align: center;
+        }
+
+        /* Arrange the digits and separator in one row. */
+        .display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 30px;
+        }
+
+        /* Each digit consists of seven rectangular segments. */
+        .digit {
+            position: relative;
+            width: 44px;
+            height: 76px;
+        }
+
+        /* Shared appearance of all seven segments. */
+        .segment {
+            position: absolute;
+            background: #292929;
+            border-radius: 4px;
+        }
+
+        /* Horizontal segments: top, middle, and bottom. */
+        .a, .g, .d {
+            width: 28px;
+            height: 6px;
+            left: 8px;
+        }
+
+        .a { top: 0; }
+        .g { top: 35px; }
+        .d { bottom: 0; }
+
+        /* Vertical segments on the left and right. */
+        .b, .c, .e, .f {
+            width: 6px;
+            height: 28px;
+        }
+
+        .b { top: 4px; right: 3px; }
+        .c { bottom: 4px; right: 3px; }
+        .e { bottom: 4px; left: 3px; }
+        .f { top: 4px; left: 3px; }
+
+        /* Illuminate only the segments required for each digit. */
+        .segment.on {
+            background: #ff3030;
+            box-shadow: 0 0 8px #ff303055;
+        }
+
+        /* The colon separates seconds from centiseconds. */
+        .colon {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 16px;
+            margin: 0 2px;
+        }
+
+        .colon span {
+            width: 7px;
+            height: 7px;
+            background: #ff3030;
+            border-radius: 2px;
+        }
+
+        /* Simple, consistent button styling. */
+        .buttons {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background: #222;
+            color: #eee;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #333;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+        /* Keep the timer usable on narrow screens. */
+        @media (max-width: 360px) {
+            .display { gap: 3px; }
+            .digit { transform: scale(.85); margin: 0 -3px; }
+            button { padding: 10px 12px; }
+        }
+    </style>
+</head>
+<body>
+
+    <main class="timer">
+
+        <!-- Three digits for seconds, then two for centiseconds. -->
+        <div class="display" id="display" aria-label="000 seconds and 00 centiseconds">
+        </div>
+
+        <!-- Controls for starting, stopping, and resetting the timer. -->
+        <div class="buttons">
+            <button id="start">Start</button>
+            <button id="stop" disabled>Stop</button>
+            <button id="reset">Reset</button>
+        </div>
+
+    </main>
+
+    <script>
+        // Each digit maps to the seven segments that must be illuminated.
+        // Segment names: a (top), b (upper-right), c (lower-right),
+        // d (bottom), e (lower-left), f (upper-left), g (middle).
+        const digitSegments = [
+            "abcdef",  // 0
+            "bc",      // 1
+            "abdeg",   // 2
+            "abcdg",   // 3
+            "bcfg",    // 4
+            "acdfg",   // 5
+            "acdefg",  // 6
+            "abc",     // 7
+            "abcdefg", // 8
+            "abcdfg"   // 9
+        ];
+
+        const display = document.getElementById("display");
+        const startButton = document.getElementById("start");
+        const stopButton = document.getElementById("stop");
+        const resetButton = document.getElementById("reset");
+
+        // Create five digits, each containing its seven segment elements.
+        // Keep references to the elements so updates do not rebuild the DOM.
+        const digits = [];
+
+        for (let i = 0; i < 5; i++) {
+            // Insert a colon between seconds and centiseconds.
+            if (i === 3) {
+                display.insertAdjacentHTML(
+                    "beforeend",
+                    '<div class="colon"><span></span><span></span></div>'
+                );
+            }
+
+            const digit = document.createElement("div");
+            digit.className = "digit";
+
+            for (const segment of "abcdefg") {
+                const element = document.createElement("span");
+                element.className = `segment ${segment}`;
+                digit.appendChild(element);
+            }
+
+            display.appendChild(digit);
+            digits.push(digit);
+        }
+
+        // The maximum is 999 seconds and 59 centiseconds.
+        const MAX = 999 * 100 + 59;
+
+        // Elapsed time is stored as an integer number of centiseconds.
+        let elapsed = 0;
+        let startTime = 0;
+        let interval = null;
+
+        // Convert the elapsed time into five digits and illuminate segments.
+        function render() {
+            const seconds = Math.floor(elapsed / 100);
+            const centiseconds = elapsed % 100;
+
+            // Format as SSSCC, with leading zeroes.
+            const value = String(seconds).padStart(3, "0")
+                + String(centiseconds).padStart(2, "0");
+
+            digits.forEach((digit, index) => {
+                // Determine which segments are required for this digit.
+                const active = digitSegments[Number(value[index])];
+
+                digit.querySelectorAll(".segment").forEach(segment => {
+                    segment.classList.toggle(
+                        "on",
+                        active.includes(segment.classList[1])
+                    );
+                });
+            });
+
+            // Update the accessible text description.
+            display.setAttribute(
+                "aria-label",
+                `${String(seconds).padStart(3, "0")} seconds and `
+                + `${String(centiseconds).padStart(2, "0")} centiseconds`
+            );
+        }
+
+        // Refresh from the actual elapsed time instead of counting interval
+        // callbacks, which can run late when the browser is busy.
+        function tick() {
+            elapsed = Math.floor((performance.now() - startTime) / 10);
+
+            if (elapsed >= MAX) {
+                elapsed = MAX;
+                stopTimer();
+                render();
+                return;
+            }
+
+            render();
+        }
+
+        // Start or resume timing without losing the previously elapsed time.
+        function startTimer() {
+            if (interval !== null || elapsed >= MAX) {
+                return;
+            }
+
+            // Subtract the saved elapsed time to resume from the right point.
+            startTime = performance.now() - elapsed * 10;
+
+            interval = setInterval(tick, 10);
+
+            startButton.disabled = true;
+            stopButton.disabled = false;
+        }
+
+        // Stop the timer while preserving its elapsed value.
+        function stopTimer() {
+            if (interval !== null) {
+                clearInterval(interval);
+                interval = null;
+            }
+
+            startButton.disabled = elapsed >= MAX;
+            stopButton.disabled = true;
+        }
+
+        // Reset the display and return the timer to its initial state.
+        function resetTimer() {
+            stopTimer();
+            elapsed = 0;
+            render();
+            startButton.disabled = false;
+        }
+
+        // Connect the buttons to their respective actions.
+        startButton.addEventListener("click", startTimer);
+        stopButton.addEventListener("click", stopTimer);
+        resetButton.addEventListener("click", resetTimer);
+
+        // Show 000:00 when the page first loads.
+        render();
+    </script>
+
+</body>
+</html>

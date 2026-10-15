@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nested Flexbox Layout</title>
+
+    <style>
+        /* Apply consistent sizing to every element. */
+        * {
+            box-sizing: border-box;
+        }
+
+        /* Center the layout and set the page background. */
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #eee;
+            color: #222;
+        }
+
+        /* Main container: stacks header, navigation, content, and footer. */
+        .page {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-width: 1000px;
+            min-height: 700px;
+            margin: auto;
+        }
+
+        /* Header contains a logo and a user profile. */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: #243447;
+            color: white;
+        }
+
+        /* Navigation items are arranged horizontally. */
+        .navigation {
+            display: flex;
+            gap: 10px;
+            padding: 12px;
+            background: #40566f;
+        }
+
+        .navigation a {
+            padding: 10px 16px;
+            color: white;
+            text-decoration: none;
+            background: #526b87;
+        }
+
+        /* Sidebar and main content sit next to each other. */
+        .content {
+            display: flex;
+            flex: 1;
+            gap: 12px;
+        }
+
+        /* Sidebar stacks its menu items vertically. */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex: 0 0 220px;
+            padding: 15px;
+            background: #d6e4f0;
+        }
+
+        .sidebar-item {
+            padding: 12px;
+            background: #b5cfe5;
+        }
+
+        /* Main area also uses a vertical Flexbox layout. */
+        .main {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 0;
+            padding: 15px;
+            background: white;
+        }
+
+        /* A row of cards, each with its own nested content. */
+        .cards {
+            display: flex;
+            gap: 12px;
+        }
+
+        .card {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 0;
+            padding: 15px;
+            background: #f4e5c8;
+        }
+
+        .card-image {
+            height: 70px;
+            background: #dfbd7e;
+        }
+
+        .card-text {
+            padding: 10px;
+            background: #ead4a9;
+        }
+
+        /* A nested row with a large box and a smaller box. */
+        .details {
+            display: flex;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .details-main {
+            flex: 2;
+            padding: 15px;
+            background: #d9ead3;
+        }
+
+        .details-side {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .details-item {
+            flex: 1;
+            padding: 12px;
+            background: #b6d7a8;
+        }
+
+        /* Footer content is aligned at opposite ends. */
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+            padding: 20px;
+            background: #243447;
+            color: white;
+        }
+
+        /* Allow nested rows to wrap on narrow screens. */
+        @media (max-width: 650px) {
+            .content {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                flex-basis: auto;
+            }
+
+            .cards {
+                flex-wrap: wrap;
+            }
+
+            .card {
+                flex-basis: 40%;
+            }
+
+            .details {
+                flex-direction: column;
+            }
+
+            .navigation {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="page">
+
+        <header class="header">
+            <strong>MY WEBSITE</strong>
+            <div>User Profile</div>
+        </header>
+
+        <nav class="navigation">
+            <a href="#">Home</a>
+            <a href="#">Products</a>
+            <a href="#">Services</a>
+            <a href="#">Contact</a>
+        </nav>
+
+        <div class="content">
+
+            <aside class="sidebar">
+                <strong>Sidebar</strong>
+                <div class="sidebar-item">Dashboard</div>
+                <div class="sidebar-item">My Account</div>
+                <div class="sidebar-item">Settings</div>
+                <div class="sidebar-item">Messages</div>
+            </aside>
+
+            <main class="main">
+                <h2>Main Content</h2>
+                <p>This area contains three nested cards.</p>
+
+                <div class="cards">
+
+                    <article class="card">
+                        <div class="card-image"></div>
+                        <strong>Card One</strong>
+                        <div class="card-text">Nested text box</div>
+                    </article>
+
+                    <article class="card">
+                        <div class="card-image"></div>
+                        <strong>Card Two</strong>
+                        <div class="card-text">Nested text box</div>
+                    </article>
+
+                    <article class="card">
+                        <div class="card-image"></div>
+                        <strong>Card Three</strong>
+                        <div class="card-text">Nested text box</div>
+                    </article>
+
+                </div>
+
+                <div class="details">
+
+                    <section class="details-main">
+                        <h3>Details Main</h3>
+                        <p>This box takes twice the available space of the side box.</p>
+                    </section>
+
+                    <div class="details-side">
+                        <div class="details-item">Side Box One</div>
+                        <div class="details-item">Side Box Two</div>
+                    </div>
+
+                </div>
+            </main>
+
+        </div>
+
+        <footer class="footer">
+            <span>Copyright 2026</span>
+            <span>Privacy | Terms</span>
+        </footer>
+
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,274 @@
+
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <!-- Define the character encoding to support Persian and other Unicode characters. -->
+    <meta charset="UTF-8">
+
+    <!-- Make the page responsive on mobile devices and different screen sizes. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Set the browser tab title. -->
+    <title>Interactive Border Radius</title>
+
+    <style>
+        /* Include padding and borders in the element's declared width and height. */
+        * {
+            box-sizing: border-box;
+        }
+
+        /* Configure the main page layout and appearance. */
+        body {
+            /* Remove the browser's default body margin. */
+            margin: 0;
+
+            /* Make the page at least as tall as the viewport. */
+            min-height: 100vh;
+
+            /* Use Flexbox to center the shape horizontally and vertically. */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            /* Set a light background color for visual contrast. */
+            background: #f8f5fa;
+
+            /* Specify a generic font for any text on the page. */
+            font-family: sans-serif;
+
+            /* Hide the native mouse cursor because a custom cursor is used. */
+            cursor: none;
+        }
+
+        /* Define the main interactive shape. */
+        .shape {
+            /* Set a fixed width and height to create a square. */
+            width: 280px;
+            height: 280px;
+
+            /* Give the shape a pink background color. */
+            background: #f062b5;
+
+            /* Start with a circular shape by rounding all four corners. */
+            border-radius: 50%;
+
+            /*
+             * Animate changes to the border radius.
+             * A short duration makes the shape react quickly to mouse movement.
+             */
+            transition: border-radius 80ms linear;
+
+            /* Add a soft shadow around the shape. */
+            box-shadow: 0 20px 50px rgba(240, 98, 181, 0.25);
+        }
+
+        /* Define the custom cursor that follows the mouse pointer. */
+        .cursor {
+            /* Position the cursor relative to the browser viewport. */
+            position: fixed;
+
+            /* Use the top-left corner as the initial positioning reference. */
+            top: 0;
+            left: 0;
+
+            /* Make the cursor large enough to see clearly. */
+            width: 40px;
+            height: 40px;
+
+            /* Fill the cursor with translucent red. */
+            background: rgba(255, 0, 0, 0.25);
+
+            /* Add a slightly more visible red outline. */
+            border: 1px solid rgba(255, 0, 0, 0.6);
+
+            /* Make the cursor circular. */
+            border-radius: 50%;
+
+            /*
+             * Prevent the custom cursor from intercepting mouse events.
+             * Mouse interactions will therefore reach the elements underneath it.
+             */
+            pointer-events: none;
+
+            /*
+             * Center the cursor on the actual mouse coordinates.
+             * Without this transform, the top-left corner would follow the pointer.
+             */
+            transform: translate(-50%, -50%);
+
+            /* Keep the custom cursor above the other page elements. */
+            z-index: 1000;
+
+            /*
+             * Hint that the cursor's position changes frequently.
+             * This may help the browser optimize rendering.
+             */
+            will-change: left, top;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- The shape whose corner radii respond to the mouse position. -->
+    <div class="shape" id="shape"></div>
+
+    <!-- The custom red cursor displayed above the page content. -->
+    <div class="cursor" id="cursor"></div>
+
+    <script>
+        // Get references to the interactive shape and the custom cursor.
+        const shape = document.getElementById('shape');
+        const cursor = document.getElementById('cursor');
+
+        /*
+         * Minimum corner radius in pixels.
+         * A corner never becomes sharper than this value when the mouse
+         * is directly on that corner.
+         */
+        const minRadius = 20;
+
+        /*
+         * Influence distance in pixels.
+         * Once the mouse is this far from a corner, that corner reaches
+         * its maximum radius.
+         */
+        const influenceDistance = 280;
+
+        // Store the latest known mouse coordinates.
+        let mouseX = 0;
+        let mouseY = 0;
+
+        /*
+         * Listen for mouse movement across the document.
+         * Only store the latest coordinates here; visual updates happen
+         * separately inside requestAnimationFrame().
+         */
+        document.addEventListener('mousemove', (event) => {
+            // Read the pointer position relative to the viewport.
+            mouseX = event.clientX;
+            mouseY = event.clientY;
+        });
+
+        /**
+         * Update the custom cursor and interactive shape.
+         *
+         * requestAnimationFrame() schedules the next update before the
+         * browser's next repaint. This avoids tying every visual update
+         * directly to the number of mousemove events.
+         */
+        function update() {
+
+            // Move the custom cursor to the latest mouse coordinates.
+            cursor.style.left = `${mouseX}px`;
+            cursor.style.top = `${mouseY}px`;
+
+            /**
+             * Get the shape's current position and dimensions.
+             * The returned rectangle uses viewport-relative coordinates,
+             * matching event.clientX and event.clientY.
+             */
+            const rect = shape.getBoundingClientRect();
+
+            /**
+             * Determine whether the mouse is inside the square.
+             * The edges are included in this comparison.
+             */
+            const isInside =
+                mouseX >= rect.left &&
+                mouseX <= rect.right &&
+                mouseY >= rect.top &&
+                mouseY <= rect.bottom;
+
+            // Restore the circular shape whenever the mouse is outside.
+            if (!isInside) {
+                shape.style.borderRadius = '50%';
+
+            } else {
+                /**
+                 * Define the four corners in CSS border-radius order:
+                 * top-left, top-right, bottom-right, bottom-left.
+                 *
+                 * CSS accepts four radii in this same order when
+                 * individual corner values are provided as a shorthand.
+                 */
+                const corners = [
+                    { x: rect.left,  y: rect.top },
+                    { x: rect.right, y: rect.top },
+                    { x: rect.right, y: rect.bottom },
+                    { x: rect.left,  y: rect.bottom }
+                ];
+
+                /**
+                 * Calculate an independent radius for each corner.
+                 * The radius depends on the distance between the pointer
+                 * and that specific corner.
+                 */
+                const radii = corners.map(corner => {
+
+                    /**
+                     * Calculate the Euclidean distance between the mouse
+                     * and the current corner.
+                     *
+                     * Math.hypot(dx, dy) is equivalent to:
+                     * Math.sqrt(dx * dx + dy * dy)
+                     */
+                    const distance = Math.hypot(
+                        mouseX - corner.x,
+                        mouseY - corner.y
+                    );
+
+                    /**
+                     * Convert the distance into a normalized value.
+                     *
+                     * A distance of zero produces 0.
+                     * A distance equal to influenceDistance produces 1.
+                     * Math.min() prevents the value from exceeding 1.
+                     */
+                    const progress = Math.min(
+                        distance / influenceDistance,
+                        1
+                    );
+
+                    /**
+                     * Interpolate between the minimum and maximum radii.
+                     *
+                     * progress = 0: radius is minRadius.
+                     * progress = 1: radius is half the shape's width.
+                     *
+                     * Intermediate distances produce proportional radii.
+                     */
+                    return minRadius +
+                        (rect.width / 2 - minRadius) * progress;
+                });
+
+                /**
+                 * Convert the four numeric radii into a CSS string.
+                 *
+                 * For example:
+                 * "20px 75px 140px 110px"
+                 *
+                 * Assigning four values lets each corner change
+                 * independently.
+                 */
+                shape.style.borderRadius = radii
+                    .map(radius => `${radius}px`)
+                    .join(' ');
+            }
+
+            /**
+             * Schedule another update for the next animation frame.
+             * Calling this continuously keeps the custom cursor synchronized
+             * with the most recently received mouse coordinates.
+             */
+            requestAnimationFrame(update);
+        }
+
+        /**
+         * Start the animation loop.
+         * The update function schedules subsequent frames by itself.
+         */
+        requestAnimationFrame(update);
+    </script>
+
+</body>
+</html>
