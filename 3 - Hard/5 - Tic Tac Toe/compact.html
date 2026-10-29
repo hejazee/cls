@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Tic-Tac-Toe</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(3, 60px);
+      gap: 4px;
+      justify-content: center;
+      margin: 16px auto;
+    }
+    .cell { height: 60px; font-size: 28px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Tic-Tac-Toe</h1>
+  <p id="status">Player X's turn</p>
+
+  <!-- JavaScript selects these buttons by their shared class. -->
+  <div id="board">
+    <button class="cell"></button><button class="cell"></button><button class="cell"></button>
+    <button class="cell"></button><button class="cell"></button><button class="cell"></button>
+    <button class="cell"></button><button class="cell"></button><button class="cell"></button>
+  </div>
+
+  <button id="reset">New game</button>
+
+  <script>
+    // Keep game data separate from the HTML so the rules are easier to follow.
+    const cells = [...document.querySelectorAll(".cell")];
+    const status = document.querySelector("#status");
+
+    let board;          // Nine entries: "X", "O", or "" for an empty cell.
+    let player;         // The player who makes the next move.
+    let gameOver;       // Prevents moves after a win or draw.
+
+    // Each group of three indexes is a possible winning row, column, or diagonal.
+    const winningLines = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
+      [0, 3, 6], [1, 4, 7], [2, 5, 8], // columns
+      [0, 4, 8], [2, 4, 6]             // diagonals
+    ];
+
+    // Start (or restart) by restoring the data and then updating the page.
+    function resetGame() {
+      board = ["", "", "", "", "", "", "", "", ""];
+      player = "X";
+      gameOver = false;
+      render();
+    }
+
+    // Return true if the current player has filled any winning line.
+    function hasWon() {
+      return winningLines.some(line =>
+        line.every(index => board[index] === player)
+      );
+    }
+
+    // Handle one cell click. The index connects a button to its board entry.
+    function play(index) {
+      // Ignore clicks on occupied cells and clicks after the game has ended.
+      if (board[index] || gameOver) return;
+
+      board[index] = player; // Record the move before checking the result.
+
+      if (hasWon()) {
+        status.textContent = `Player ${player} wins!`;
+        gameOver = true;
+      } else if (board.every(cell => cell !== "")) {
+        // If no cells are empty and nobody won, the game is a draw.
+        status.textContent = "It's a draw!";
+        gameOver = true;
+      } else {
+        // Only switch players when the game is still in progress.
+        player = player === "X" ? "O" : "X";
+      }
+
+      render(); // Keep the buttons and status text in sync with the game data.
+    }
+
+    // Display the current data. Keeping rendering separate avoids repeated UI code.
+    function render() {
+      cells.forEach((cell, index) => {
+        cell.textContent = board[index];
+        // Disable occupied cells and every cell after the game ends.
+        cell.disabled = Boolean(board[index]) || gameOver;
+      });
+
+      // Don't overwrite a win/draw message with the ordinary turn message.
+      if (!gameOver) status.textContent = `Player ${player}'s turn`;
+    }
+
+    // One listener per cell keeps this beginner example straightforward.
+    cells.forEach((cell, index) => {
+      cell.addEventListener("click", () => play(index));
+    });
+
+    document.querySelector("#reset").addEventListener("click", resetGame);
+
+    resetGame(); // Initialize the variables and show the empty board on page load.
+  </script>
+</body>
+</html>
